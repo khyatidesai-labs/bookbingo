@@ -307,7 +307,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const card = makeEmptyCard({
         id: crypto.randomUUID(),
         userId: profile.id,
-        title: title ?? `Reading Challenge · ${new Date().toLocaleDateString()}`,
+        title: title ?? `Reading Challenge · ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
         pool: BOOKS,
         seed: Date.now(),
       });
