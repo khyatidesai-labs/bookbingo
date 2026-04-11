@@ -269,7 +269,7 @@ export default function BingoSection() {
                             e.preventDefault();
                             handleClearSquare(idx);
                           }}
-                          className={`relative aspect-square rounded-xl p-1.5 md:p-2 flex flex-col items-center justify-center text-center transition-all duration-300 ${
+                          className={`relative aspect-square rounded-xl overflow-hidden flex flex-col items-center justify-center text-center transition-all duration-300 ${
                             winner
                               ? 'bg-success-DEFAULT shadow-lg shadow-success-DEFAULT/30 scale-[1.04]'
                               : completed
@@ -286,14 +286,35 @@ export default function BingoSection() {
                               : challenge?.longLabel ?? challenge?.label
                           }
                         >
-                          {completed && (
-                            <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-white/25 flex items-center justify-center">
-                              <Check size={8} className="text-white" strokeWidth={3} />
-                            </div>
+                          {book ? (
+                            <>
+                              <img
+                                src={book.cover}
+                                alt={book.title}
+                                className="absolute inset-0 w-full h-full object-cover"
+                              />
+                              <div className="absolute inset-0 bg-black/50" />
+                              {completed && (
+                                <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-white/25 flex items-center justify-center z-10">
+                                  <Check size={8} className="text-white" strokeWidth={3} />
+                                </div>
+                              )}
+                              <span className="relative z-10 font-body text-[8px] md:text-[9px] font-semibold text-white leading-tight line-clamp-3 px-1 text-center">
+                                {book.title}
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              {completed && (
+                                <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-white/25 flex items-center justify-center">
+                                  <Check size={8} className="text-white" strokeWidth={3} />
+                                </div>
+                              )}
+                              <span className="font-body text-[9px] md:text-[10px] font-semibold text-white leading-tight line-clamp-3 px-1.5 md:px-2">
+                                {challenge?.label ?? '—'}
+                              </span>
+                            </>
                           )}
-                          <span className="font-body text-[9px] md:text-[10px] font-semibold text-white leading-tight line-clamp-3">
-                            {book?.title ?? challenge?.label ?? '—'}
-                          </span>
                         </button>
                       );
                     })}

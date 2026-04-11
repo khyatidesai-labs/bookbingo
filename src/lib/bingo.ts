@@ -98,16 +98,17 @@ export function getBookForSquare(square: BingoSquare | undefined): Book | undefi
 }
 
 /** Fresh in-memory card — persisted via the storage layer. */
-export function makeEmptyCard(params: { id: string; userId: string; title: string; pool: Book[]; seed?: number }): BingoCard {
+export function makeEmptyCard(params: { id: string; userId: string; title: string; pool: Book[]; seed?: number; createdAt?: string }): BingoCard {
   const challengeIds = generateChallengeIds(params.pool, params.seed);
   const now = new Date().toISOString();
+  const createdAt = params.createdAt ?? now;
   return {
     id: params.id,
     userId: params.userId,
     title: params.title,
     challengeIds,
     squares: emptySquares(challengeIds),
-    createdAt: now,
+    createdAt,
     updatedAt: now,
   };
 }

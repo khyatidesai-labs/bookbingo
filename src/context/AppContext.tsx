@@ -102,7 +102,7 @@ interface AppState {
   toggleMood: (m: Mood) => void;
   clearFilters: () => void;
   toggleSaved: (bookId: string) => void;
-  createNewCard: (title?: string) => Promise<BingoCard>;
+  createNewCard: (title?: string, forDate?: Date) => Promise<BingoCard>;
   setActiveCard: (cardId: string) => void;
   deleteCard: (cardId: string) => void;
   assignBookToSquare: (cardId: string, squareIdx: number, bookId: string) => void;
@@ -214,6 +214,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => unsub();
   }, [profile]);
 
+  // Seed a March 2026 card the first time a user's account has no cards.
+  useEffect(() => {
+    if (!ready || !profile || bingoCards.length > 0) return;
+    const card = makeEmptyCard({
+      id: crypto.randomUUID(),
+      userId: profile.id,
+      title: 'Reading Challenge · March 2026',
+      pool: BOOKS,
+      seed: 20260301,
+      createdAt: new Date('2026-03-01T00:00:00.000Z').toISOString(),
+    });
+    persistCard(card);
+    setActiveCardId(card.id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, profile?.id]);
+
   // Fetch readers whenever a book detail modal is opened, and subscribe to
   // live changes so "+2 just started" ticks without a refresh.
   useEffect(() => {
@@ -302,14 +318,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const createNewCard = useCallback(
-    async (title?: string): Promise<BingoCard> => {
+    async (title?: string, forDate?: Date): Promise<BingoCard> => {
       if (!profile) throw new Error('Profile not ready');
+      const d = forDate ?? new Date();
+      const cardTitle = title ?? `Reading Challenge · ${d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
       const card = makeEmptyCard({
         id: crypto.randomUUID(),
         userId: profile.id,
-        title: title ?? `Reading Challenge · ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
+        title: cardTitle,
         pool: BOOKS,
         seed: Date.now(),
+        createdAt: forDate ? forDate.toISOString() : undefined,
       });
       persistCard(card);
       setActiveCardId(card.id);
@@ -321,15 +340,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteCard = useCallback(
     (cardId: string) => {
       if (!profile) return;
-      setBingoCards((prev) => prev.filter((c) => c.id !== cardId));
-      setActiveCardId((prev) => {
-        if (prev !== cardId) return prev;
-        const remaining = bingoCards.filter((c) => c.id !== cardId);
-        return remaining[0]?.id ?? null;
+      setBingoCards((prev) => {
+        const remaining = prev.filter((c) => c.id !== cardId);
+        setActiveCardId((current) => (current === cardId ? (remaining[0]?.id ?? null) : current));
+        return remaining;
       });
       void deleteBingoCard(profile.id, cardId);
     },
-    [bingoCards, profile],
+    [profile],
   );
 
   const updateCardSquare = useCallback(

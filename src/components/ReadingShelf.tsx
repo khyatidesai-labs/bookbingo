@@ -26,10 +26,14 @@ export default function ReadingShelf() {
     openAuthModal,
     profile,
     respondToRec,
+    dynamicBook,
   } = useApp();
 
   const signedIn = Boolean(profile?.email);
-  const currentBook = reading[0] ? BOOK_BY_ID[reading[0].bookId] : null;
+  const firstReading = reading[0];
+  const currentBook = firstReading
+    ? (BOOK_BY_ID[firstReading.bookId] ?? (dynamicBook?.id === firstReading.bookId ? dynamicBook : null))
+    : null;
   const topRec = inbox[0];
   const topRecBook = topRec ? BOOK_BY_ID[topRec.bookId] : null;
 
