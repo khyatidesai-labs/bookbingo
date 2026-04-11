@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { PROFESSION_BY_ID } from '../data/professions';
 import { MOOD_BY_ID } from '../data/moods';
-import { fetchTrendingBooks, fetchBooksByProfession, fetchBooksByMood } from '../lib/openLibraryService';
 import BookCard from './BookCard';
 import type { Book } from '../types';
 
@@ -30,40 +29,46 @@ export default function TrendingNow() {
   const hasFilters = Boolean(selectedProfession || selectedMoods.length);
   const activeProfession = selectedProfession ? PROFESSION_BY_ID[selectedProfession] : null;
 
-  // Fetch trending or filtered books
   useEffect(() => {
     setLoading(true);
+    const controller = new AbortController();
+
     const loadBooks = async () => {
-      let fetchedBooks: Book[] = [];
+      try {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
-      if (selectedProfession || selectedMoods.length > 0) {
-        // If filters are active, combine results from profession and moods
-        const profBooks = selectedProfession
-          ? await fetchBooksByProfession(selectedProfession)
-          : [];
-        const moodBooks = selectedMoods.length > 0
-          ? await Promise.all(selectedMoods.map(m => fetchBooksByMood(m)))
-              .then(results => results.flat())
-          : [];
+        const body: Record<string, unknown> = {};
+        if (selectedProfession) body.profession = selectedProfession;
+        if (selectedMoods.length > 0) body.moods = selectedMoods;
 
-        // Combine and deduplicate
-        const combined = [...profBooks, ...moodBooks];
-        const seen = new Set<string>();
-        fetchedBooks = combined.filter(b => {
-          if (seen.has(b.id)) return false;
-          seen.add(b.id);
-          return true;
+        const res = await fetch(`${supabaseUrl}/functions/v1/trending-books`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseKey}`,
+          },
+          body: JSON.stringify(body),
+          signal: controller.signal,
         });
-      } else {
-        // No filters, show trending books
-        fetchedBooks = await fetchTrendingBooks();
-      }
 
-      setBooks(fetchedBooks);
-      setLoading(false);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!controller.signal.aborted) {
+          setBooks(data.books ?? []);
+        }
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          console.error('Failed to fetch trending books:', err);
+          setBooks([]);
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
     };
 
     loadBooks();
+    return () => controller.abort();
   }, [selectedProfession, selectedMoods]);
 
   return (
