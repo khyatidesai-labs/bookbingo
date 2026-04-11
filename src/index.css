@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -11,6 +13,8 @@
     font-family: 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    background-color: #0F0B1A;
+    color: #F5F3FF;
   }
 }
 
@@ -22,4 +26,52 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  .glass {
+    background: rgba(29, 16, 56, 0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(124, 58, 237, 0.2);
+  }
+
+  .glass-card {
+    background: linear-gradient(135deg, rgba(30, 19, 56, 0.9) 0%, rgba(45, 27, 105, 0.6) 100%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(124, 58, 237, 0.2);
+  }
+
+  .purple-glow {
+    box-shadow: 0 0 30px rgba(124, 58, 237, 0.35);
+  }
+
+  .text-gradient-purple {
+    background: linear-gradient(135deg, #A78BFA 0%, #C084FC 50%, #F9A8D4 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-gold {
+    background: linear-gradient(135deg, #FCD34D 0%, #F59E0B 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .shimmer-bg {
+    background: linear-gradient(
+      90deg,
+      rgba(124, 58, 237, 0.05) 0%,
+      rgba(192, 132, 252, 0.15) 50%,
+      rgba(124, 58, 237, 0.05) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }

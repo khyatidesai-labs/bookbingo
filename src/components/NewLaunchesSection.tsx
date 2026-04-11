@@ -30,8 +30,7 @@ export default function NewLaunchesSection() {
     try {
       const newBooks = await fetchNewReleasesFromEdge();
       setBooks(newBooks);
-    } catch (err) {
-      console.error('Failed to load new releases:', err);
+    } catch {
       setError(true);
     } finally {
       setLoading(false);
@@ -45,48 +44,58 @@ export default function NewLaunchesSection() {
   }, []);
 
   return (
-    <section id="new-launches" className="py-10 bg-gradient-to-br from-accent-50 to-white">
-      <div className="max-w-7xl mx-auto px-6 lg:px-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+    <section
+      id="new-launches"
+      className="py-12 relative overflow-hidden"
+      style={{ background: 'linear-gradient(180deg, #0F0B1A 0%, #1A1030 100%)' }}
+    >
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute bottom-0 left-1/3 w-96 h-64 rounded-full blur-3xl opacity-[0.07]" style={{ background: 'radial-gradient(circle, #C084FC, transparent)' }} />
+        <div className="absolute top-0 left-0 right-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(124,58,237,0.3), transparent)' }} />
+      </div>
+
+      <div className="relative max-w-7xl mx-auto px-6 lg:px-8">
+        <div className="flex items-center justify-between mb-8">
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <Flame size={16} className="text-accent-500" />
-              <span className="font-body text-accent-500 text-[11px] font-semibold uppercase tracking-[0.2em]">
+              <Flame size={16} className="text-primary-400" />
+              <span className="font-body text-primary-400 text-[11px] font-semibold uppercase tracking-[0.2em]">
                 Latest Releases
               </span>
             </div>
-            <h2 className="font-heading text-2xl md:text-3xl font-bold text-primary-900">
+            <h2 className="font-heading text-2xl md:text-3xl font-bold text-white">
               New Launches This Week
             </h2>
           </div>
-          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent-100">
-            <Sparkles size={12} className="text-accent-600" />
-            <span className="font-body text-[10px] font-semibold text-accent-600">
-              Fresh from publishers
-            </span>
+          <div
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+            style={{ background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.25)' }}
+          >
+            <Sparkles size={12} className="text-primary-400" />
+            <span className="font-body text-[10px] font-semibold text-white/55">Fresh from publishers</span>
           </div>
         </div>
 
-        {/* Books Grid */}
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {Array.from({ length: 10 }).map((_, i) => (
-              <div key={i} className="animate-pulse">
-                <div className="bg-primary-100 rounded-xl aspect-[2/3] mb-3" />
-                <div className="bg-primary-100 rounded h-3 mb-2 w-3/4" />
-                <div className="bg-primary-100 rounded h-3 w-1/2" />
+              <div key={i}>
+                <div className="aspect-[2/3] rounded-xl mb-2 shimmer-bg" style={{ border: '1px solid rgba(124,58,237,0.12)' }} />
+                <div className="h-3 rounded shimmer-bg mb-1.5 w-3/4" />
+                <div className="h-3 rounded shimmer-bg w-1/2" />
               </div>
             ))}
           </div>
         ) : error ? (
-          <div className="text-center py-16 bg-white rounded-2xl border border-primary-100">
-            <p className="font-body text-primary-500 mb-4">
-              Could not load new releases.
-            </p>
+          <div
+            className="text-center py-16 rounded-2xl"
+            style={{ background: 'rgba(124,58,237,0.05)', border: '1px solid rgba(124,58,237,0.15)' }}
+          >
+            <p className="font-body text-white/45 mb-4">Could not load new releases.</p>
             <button
               onClick={loadNewReleases}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent-100 text-accent-700 text-sm font-semibold hover:bg-accent-200 transition-colors"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold text-white transition-all"
+              style={{ background: 'rgba(124,58,237,0.2)', border: '1px solid rgba(124,58,237,0.3)' }}
             >
               <RefreshCw size={14} />
               Try again
@@ -99,16 +108,20 @@ export default function NewLaunchesSection() {
                 key={book.id}
                 book={book}
                 tag="New"
-                onClick={() => openBook(book.id)}
+                onClick={() => { setDynamicBook(book); openBook(book.id); }}
               />
             ))}
           </div>
         ) : (
-          <div className="text-center py-16 bg-white rounded-2xl border border-primary-100">
-            <p className="font-body text-primary-500 mb-4">No new releases found.</p>
+          <div
+            className="text-center py-16 rounded-2xl"
+            style={{ background: 'rgba(124,58,237,0.05)', border: '1px solid rgba(124,58,237,0.15)' }}
+          >
+            <p className="font-body text-white/45 mb-4">No new releases found.</p>
             <button
               onClick={loadNewReleases}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent-100 text-accent-700 text-sm font-semibold hover:bg-accent-200 transition-colors"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold text-white"
+              style={{ background: 'rgba(124,58,237,0.2)', border: '1px solid rgba(124,58,237,0.3)' }}
             >
               <RefreshCw size={14} />
               Refresh
@@ -116,10 +129,15 @@ export default function NewLaunchesSection() {
           </div>
         )}
 
-        {/* Footer CTA */}
         <div className="mt-8 text-center">
-          <p className="font-body text-primary-500 text-sm">
-            Discover more in the <a href="#discover" className="font-semibold text-accent-600 hover:text-accent-700">Browse section</a>
+          <p className="font-body text-white/30 text-sm">
+            Discover more in the{' '}
+            <button
+              onClick={() => document.getElementById('discover')?.scrollIntoView({ behavior: 'smooth' })}
+              className="font-semibold text-primary-400 hover:text-primary-300 transition-colors"
+            >
+              Browse section
+            </button>
           </p>
         </div>
       </div>

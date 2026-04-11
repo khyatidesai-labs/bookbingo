@@ -10,14 +10,6 @@ interface Props {
 
 type Tab = 'saved' | 'reading' | 'inbox' | 'readers';
 
-/**
- * Right-hand drawer. Four tabs:
- *  - Saved: books the user bookmarked
- *  - Reading: books marked as currently reading
- *  - Inbox: recommendations from other readers
- *  - Readers: directory of other signed-in users, so you can *find* people
- *    to recommend books to without typing an email
- */
 export default function SavedBooksDrawer({ open, onClose }: Props) {
   const {
     savedBooks,
@@ -44,55 +36,65 @@ export default function SavedBooksDrawer({ open, onClose }: Props) {
   return (
     <>
       <div
-        className={`fixed inset-0 bg-primary-900/60 backdrop-blur-sm z-40 transition-opacity ${
-          open ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
+        className={`fixed inset-0 z-40 transition-opacity backdrop-blur-sm ${open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        style={{ background: 'rgba(8,5,17,0.75)' }}
         onClick={onClose}
       />
       <aside
-        className={`fixed top-0 right-0 bottom-0 w-full sm:w-80 bg-white shadow-2xl z-50 transform transition-transform duration-300 ${
-          open ? 'translate-x-0' : 'translate-x-full'
-        } flex flex-col`}
+        className={`fixed top-0 right-0 bottom-0 w-full sm:w-80 z-50 transform transition-transform duration-300 flex flex-col ${open ? 'translate-x-0' : 'translate-x-full'}`}
+        style={{
+          background: 'linear-gradient(180deg, #1A1030 0%, #0F0B1A 100%)',
+          borderLeft: '1px solid rgba(124,58,237,0.2)',
+          boxShadow: '-8px 0 40px rgba(124,58,237,0.15)',
+        }}
       >
-        <div className="px-4 py-3 border-b border-primary-100 flex items-center justify-between">
+        <div
+          className="px-4 py-3 flex items-center justify-between"
+          style={{ borderBottom: '1px solid rgba(124,58,237,0.15)' }}
+        >
           <div>
-            <h2 className="font-heading text-base font-bold text-primary-900">
+            <h2 className="font-heading text-base font-bold text-white">
               My Reading List
             </h2>
-            <p className="font-body text-[10px] text-primary-500 mt-0.5">
-              {savedBooks.length} saved ·{' '}
+            <p className="font-body text-[10px] mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>
+              {savedBooks.length} saved &middot;{' '}
               {mode === 'supabase' ? 'synced to cloud' : 'stored locally'}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-full bg-primary-100 hover:bg-primary-200 flex items-center justify-center transition-colors"
+            className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
+            style={{ background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.25)' }}
             aria-label="Close"
           >
-            <X size={12} className="text-primary-600" />
+            <X size={12} className="text-white/60" />
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="px-4 pt-2 border-b border-primary-100 flex gap-0.5">
+        <div
+          className="px-4 pt-2 flex gap-0.5"
+          style={{ borderBottom: '1px solid rgba(124,58,237,0.12)' }}
+        >
           {tabs.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`px-2 py-2 -mb-px font-body text-[11px] font-semibold border-b-2 transition-colors flex items-center gap-1 ${
+              className="px-2 py-2 -mb-px font-body text-[11px] font-semibold border-b-2 transition-colors flex items-center gap-1"
+              style={
                 tab === t.id
-                  ? 'border-accent-500 text-primary-900'
-                  : 'border-transparent text-primary-500 hover:text-primary-800'
-              }`}
+                  ? { borderColor: '#A78BFA', color: '#fff' }
+                  : { borderColor: 'transparent', color: 'rgba(255,255,255,0.4)' }
+              }
             >
               {t.label}
               {t.count > 0 && (
                 <span
-                  className={`text-[9px] font-semibold px-1 py-0 rounded-full min-w-[14px] text-center ${
+                  className="text-[9px] font-semibold px-1 py-0 rounded-full min-w-[14px] text-center"
+                  style={
                     t.badge && tab !== t.id
-                      ? 'bg-rose-500 text-white'
-                      : 'bg-primary-100 text-primary-600'
-                  }`}
+                      ? { background: 'linear-gradient(135deg, #EC4899, #DB2777)', color: '#fff' }
+                      : { background: 'rgba(124,58,237,0.2)', color: 'rgba(255,255,255,0.6)' }
+                  }
                 >
                   {t.count}
                 </span>
@@ -105,7 +107,7 @@ export default function SavedBooksDrawer({ open, onClose }: Props) {
           {tab === 'saved' &&
             (savedBooks.length === 0 ? (
               <EmptyState
-                icon={<BookmarkX size={20} className="text-primary-400" />}
+                icon={<BookmarkX size={20} style={{ color: 'rgba(167,139,250,0.6)' }} />}
                 title="No saved books yet"
                 sub="Tap the bookmark on any book to add it here."
               />
@@ -114,30 +116,25 @@ export default function SavedBooksDrawer({ open, onClose }: Props) {
                 {savedBooks.map((book) => (
                   <li
                     key={book.id}
-                    className="flex gap-2.5 p-2 rounded-lg border border-primary-100 hover:border-primary-200 transition-colors cursor-pointer"
+                    className="flex gap-2.5 p-2 rounded-xl cursor-pointer transition-all duration-200"
+                    style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.12)' }}
                     onClick={() => openBook(book.id)}
                   >
-                    <div className="w-10 h-14 flex-none rounded overflow-hidden bg-primary-100">
-                      <img
-                        src={book.cover}
-                        alt=""
-                        className="w-full h-full object-cover"
-                      />
+                    <div className="w-10 h-14 flex-none rounded-lg overflow-hidden" style={{ background: 'rgba(124,58,237,0.2)' }}>
+                      <img src={book.cover} alt="" className="w-full h-full object-cover" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-heading font-semibold text-primary-900 text-xs leading-tight line-clamp-2">
+                      <p className="font-heading font-semibold text-white text-xs leading-tight line-clamp-2">
                         {book.title}
                       </p>
-                      <p className="font-body text-primary-500 text-[11px] mt-0.5 truncate">
+                      <p className="font-body text-[11px] mt-0.5 truncate" style={{ color: 'rgba(255,255,255,0.4)' }}>
                         {book.author}
                       </p>
                     </div>
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleSaved(book.id);
-                      }}
-                      className="self-start text-primary-400 hover:text-rose-500 transition-colors"
+                      onClick={(e) => { e.stopPropagation(); toggleSaved(book.id); }}
+                      className="self-start transition-colors"
+                      style={{ color: 'rgba(255,255,255,0.3)' }}
                       aria-label="Remove"
                     >
                       <X size={12} />
@@ -150,7 +147,7 @@ export default function SavedBooksDrawer({ open, onClose }: Props) {
           {tab === 'reading' &&
             (readingBooks.length === 0 ? (
               <EmptyState
-                icon={<BookOpen size={20} className="text-primary-400" />}
+                icon={<BookOpen size={20} style={{ color: 'rgba(167,139,250,0.6)' }} />}
                 title="Nothing in progress"
                 sub='Open a book and tap "I&apos;m reading" to see it here.'
               />
@@ -159,24 +156,21 @@ export default function SavedBooksDrawer({ open, onClose }: Props) {
                 {readingBooks.map((book) => (
                   <li
                     key={book.id}
-                    className="flex gap-2.5 p-2 rounded-lg border border-primary-100 hover:border-primary-200 transition-colors cursor-pointer"
+                    className="flex gap-2.5 p-2 rounded-xl cursor-pointer transition-all duration-200"
+                    style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.12)' }}
                     onClick={() => openBook(book.id)}
                   >
-                    <div className="w-10 h-14 flex-none rounded overflow-hidden bg-primary-100">
-                      <img
-                        src={book.cover}
-                        alt=""
-                        className="w-full h-full object-cover"
-                      />
+                    <div className="w-10 h-14 flex-none rounded-lg overflow-hidden" style={{ background: 'rgba(124,58,237,0.2)' }}>
+                      <img src={book.cover} alt="" className="w-full h-full object-cover" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-heading font-semibold text-primary-900 text-xs leading-tight line-clamp-2">
+                      <p className="font-heading font-semibold text-white text-xs leading-tight line-clamp-2">
                         {book.title}
                       </p>
-                      <p className="font-body text-primary-500 text-[11px] mt-0.5 truncate">
+                      <p className="font-body text-[11px] mt-0.5 truncate" style={{ color: 'rgba(255,255,255,0.4)' }}>
                         {book.author}
                       </p>
-                      <p className="font-body text-accent-600 text-[10px] font-semibold mt-0.5">
+                      <p className="font-body text-[10px] font-semibold mt-0.5 text-primary-400">
                         Currently reading
                       </p>
                     </div>
@@ -188,7 +182,7 @@ export default function SavedBooksDrawer({ open, onClose }: Props) {
           {tab === 'inbox' &&
             (inbox.length === 0 ? (
               <EmptyState
-                icon={<Inbox size={20} className="text-primary-400" />}
+                icon={<Inbox size={20} style={{ color: 'rgba(167,139,250,0.6)' }} />}
                 title="No recommendations yet"
                 sub="When a friend sends you a book, it'll show up here."
               />
@@ -200,31 +194,29 @@ export default function SavedBooksDrawer({ open, onClose }: Props) {
                   return (
                     <li
                       key={rec.id}
-                      className="p-2 rounded-lg border border-primary-100"
+                      className="p-2 rounded-xl"
+                      style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.12)' }}
                     >
                       <div className="flex gap-2.5">
                         <div
-                          className="w-10 h-14 flex-none rounded overflow-hidden bg-primary-100 cursor-pointer"
+                          className="w-10 h-14 flex-none rounded-lg overflow-hidden cursor-pointer"
+                          style={{ background: 'rgba(124,58,237,0.2)' }}
                           onClick={() => openBook(book.id)}
                         >
-                          <img
-                            src={book.cover}
-                            alt=""
-                            className="w-full h-full object-cover"
-                          />
+                          <img src={book.cover} alt="" className="w-full h-full object-cover" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="font-body text-[10px] text-accent-600 font-semibold uppercase tracking-wider">
+                          <p className="font-body text-[10px] font-semibold uppercase tracking-wider text-primary-400">
                             {rec.fromName} sent
                           </p>
                           <p
-                            className="font-heading font-semibold text-primary-900 text-xs leading-tight line-clamp-2 cursor-pointer"
+                            className="font-heading font-semibold text-white text-xs leading-tight line-clamp-2 cursor-pointer"
                             onClick={() => openBook(book.id)}
                           >
                             {book.title}
                           </p>
                           {rec.note && (
-                            <p className="font-body text-primary-600 text-[11px] italic mt-0.5 line-clamp-2">
+                            <p className="font-body text-[11px] italic mt-0.5 line-clamp-2" style={{ color: 'rgba(255,255,255,0.5)' }}>
                               &ldquo;{rec.note}&rdquo;
                             </p>
                           )}
@@ -233,14 +225,20 @@ export default function SavedBooksDrawer({ open, onClose }: Props) {
                       <div className="flex gap-1.5 mt-2">
                         <button
                           onClick={() => respondToRec(rec.id, 'saved')}
-                          className="flex-1 font-body text-[11px] font-semibold py-1.5 rounded-md bg-primary-900 text-white hover:bg-primary-800 flex items-center justify-center gap-1"
+                          className="flex-1 font-body text-[11px] font-semibold py-1.5 rounded-lg flex items-center justify-center gap-1 text-white transition-all"
+                          style={{ background: 'linear-gradient(135deg, #7C3AED, #A855F7)' }}
                         >
                           <Check size={11} />
                           Save
                         </button>
                         <button
                           onClick={() => respondToRec(rec.id, 'dismissed')}
-                          className="flex-1 font-body text-[11px] font-medium py-1.5 rounded-md border border-primary-200 text-primary-600 hover:bg-primary-50"
+                          className="flex-1 font-body text-[11px] font-medium py-1.5 rounded-lg transition-colors"
+                          style={{
+                            border: '1px solid rgba(124,58,237,0.25)',
+                            color: 'rgba(255,255,255,0.5)',
+                            background: 'transparent',
+                          }}
                         >
                           Dismiss
                         </button>
@@ -254,25 +252,29 @@ export default function SavedBooksDrawer({ open, onClose }: Props) {
           {tab === 'readers' &&
             (readers.length === 0 ? (
               <EmptyState
-                icon={<Users size={20} className="text-primary-400" />}
+                icon={<Users size={20} style={{ color: 'rgba(167,139,250,0.6)' }} />}
                 title="No other readers yet"
-                sub="Once friends sign in, they'll show up here and you can send them books."
+                sub="Once friends sign in, they'll show up here."
               />
             ) : (
               <ul className="space-y-1.5">
                 {readers.map((r) => (
                   <li
                     key={r.id}
-                    className="flex items-center gap-2 p-2 rounded-lg border border-primary-100 hover:border-primary-200 transition-colors"
+                    className="flex items-center gap-2 p-2 rounded-xl transition-colors"
+                    style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.12)' }}
                   >
-                    <span className="w-8 h-8 rounded-full bg-accent-100 text-accent-700 font-semibold text-xs flex items-center justify-center flex-none">
+                    <span
+                      className="w-8 h-8 rounded-full font-semibold text-xs flex items-center justify-center flex-none text-white"
+                      style={{ background: 'linear-gradient(135deg, #7C3AED, #A855F7)' }}
+                    >
                       {r.name.slice(0, 1).toUpperCase()}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="font-heading font-semibold text-primary-900 text-xs truncate">
+                      <p className="font-heading font-semibold text-white text-xs truncate">
                         {r.name}
                       </p>
-                      <p className="font-body text-primary-500 text-[10px] truncate">
+                      <p className="font-body text-[10px] truncate" style={{ color: 'rgba(255,255,255,0.4)' }}>
                         {r.email}
                       </p>
                     </div>
@@ -297,12 +299,16 @@ function EmptyState({
 }) {
   return (
     <div className="text-center py-12">
-      <div className="w-12 h-12 rounded-full bg-primary-100 mx-auto mb-3 flex items-center justify-center">
+      <div
+        className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center"
+        style={{ background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.2)' }}
+      >
         {icon}
       </div>
-      <p className="font-heading font-semibold text-primary-700 text-sm">{title}</p>
+      <p className="font-heading font-semibold text-white text-sm">{title}</p>
       <p
-        className="font-body text-primary-500 text-[11px] mt-1 px-4"
+        className="font-body text-[11px] mt-1 px-4"
+        style={{ color: 'rgba(255,255,255,0.35)' }}
         dangerouslySetInnerHTML={{ __html: sub }}
       />
     </div>
