@@ -364,11 +364,11 @@ export default function ReadingShelf() {
                   Tap an avatar to see what they're reading.
                 </p>
                 <button
-                  onClick={openSavedDrawer}
+                  onClick={() => document.getElementById('community')?.scrollIntoView({ behavior: 'smooth' })}
                   className="w-full font-body text-[11px] font-semibold py-1.5 rounded-lg text-white/80 hover:text-white flex items-center justify-center gap-1.5 transition-colors"
                   style={{ border: '1px solid rgba(124,58,237,0.25)' }}
                 >
-                  <Send size={11} />
+                  <Users size={11} />
                   Browse readers
                 </button>
               </div>

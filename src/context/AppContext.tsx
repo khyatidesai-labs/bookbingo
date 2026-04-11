@@ -178,11 +178,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // switching accounts doesn't require a full page reload.
   const loadForUser = useCallback(async (userId: string, m: StorageMode) => {
     setMode(m);
-    const [p, cards, myReading, myInbox, directory] = await Promise.all([
-      getProfile(userId),
+    const p = await getProfile(userId);
+    const [cards, myReading, myInbox, directory] = await Promise.all([
       listBingoCards(userId),
       listMyReading(userId),
-      listInbox(userId),
+      listInbox(userId, p.email),
       listReaders({ excludeUserId: userId, limit: 50 }),
     ]);
     setProfileState(p);

@@ -676,8 +676,16 @@ export async function sendRecommendation(params: {
       .select('id')
       .eq('email', params.toEmail.trim().toLowerCase())
       .maybeSingle();
-    if (!match) throw new Error(`No reader found with email ${params.toEmail}`);
-    toUser = match.id;
+    if (match) {
+      toUser = match.id;
+    } else {
+      // Email not found in Supabase — save locally keyed by email so if they
+      // sign up later on this device they'll see it.
+      const emailKey = params.toEmail.trim().toLowerCase();
+      const localRec = { ...rec, toUser: emailKey };
+      writeLocalRecs(emailKey, [localRec, ...readLocalRecs(emailKey)]);
+      return localRec;
+    }
   }
   if (!toUser) throw new Error('No recipient specified');
 
@@ -706,11 +714,21 @@ export async function sendRecommendation(params: {
   return rowToRec(data, params.fromName);
 }
 
-export async function listInbox(userId: string): Promise<BookRecommendation[]> {
+export async function listInbox(userId: string, userEmail?: string): Promise<BookRecommendation[]> {
   // localStorage path: always filter by 'pending' so dismissed/saved recs
   // don't re-appear after a page reload.
+  const localById = readLocalRecs(userId).filter((r) => r.status === 'pending');
+  // Also pick up any recs that were addressed to this user's email before they
+  // had a UUID (e.g. sent via email fallback when not yet registered).
+  const localByEmail = userEmail
+    ? readLocalRecs(userEmail.trim().toLowerCase()).filter((r) => r.status === 'pending')
+    : [];
+  const localAll = [...localById, ...localByEmail].filter(
+    (r, i, arr) => arr.findIndex((x) => x.id === r.id) === i,
+  );
+
   if (mode === 'local' || !supabase) {
-    return readLocalRecs(userId).filter((r) => r.status === 'pending');
+    return localAll;
   }
   const { data, error } = await supabase
     .from('book_recommendations')
@@ -721,7 +739,7 @@ export async function listInbox(userId: string): Promise<BookRecommendation[]> {
     .limit(100);
   // Fall back to localStorage (pending only) if Supabase table is missing.
   if (error || !data || data.length === 0) {
-    return readLocalRecs(userId).filter((r) => r.status === 'pending');
+    return localAll;
   }
   return data.map((r: Record<string, unknown>) =>
     rowToRec(r, (r.profiles as { name?: string } | undefined)?.name ?? 'A reader'),

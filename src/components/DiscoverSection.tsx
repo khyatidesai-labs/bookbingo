@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Compass, Briefcase, Sparkles, BookOpen } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { Compass, Briefcase, Sparkles, BookOpen, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
 import { PROFESSIONS } from '../data/professions';
@@ -78,6 +78,11 @@ export default function DiscoverSection() {
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(false);
+  const genreScrollRef = useRef<HTMLDivElement>(null);
+
+  const scrollGenre = (dir: 'left' | 'right') => {
+    genreScrollRef.current?.scrollBy({ left: dir === 'right' ? 320 : -320, behavior: 'smooth' });
+  };
 
   const genresWithBooks = useMemo(() =>
     GENRES.filter(genre =>
@@ -280,7 +285,24 @@ export default function DiscoverSection() {
         )}
 
         {tab === 'genre' && (
-          <div className="flex gap-3 overflow-x-auto pb-3 -mx-6 px-6 scrollbar-hide">
+          <div className="relative">
+            <button
+              onClick={() => scrollGenre('left')}
+              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full flex items-center justify-center transition-all"
+              style={{ background: 'rgba(29,16,56,0.85)', border: '1px solid rgba(124,58,237,0.3)', backdropFilter: 'blur(8px)' }}
+              aria-label="Scroll left"
+            >
+              <ChevronLeft size={16} className="text-white/70" />
+            </button>
+            <button
+              onClick={() => scrollGenre('right')}
+              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full flex items-center justify-center transition-all"
+              style={{ background: 'rgba(29,16,56,0.85)', border: '1px solid rgba(124,58,237,0.3)', backdropFilter: 'blur(8px)' }}
+              aria-label="Scroll right"
+            >
+              <ChevronRight size={16} className="text-white/70" />
+            </button>
+          <div ref={genreScrollRef} className="flex gap-3 overflow-x-auto pb-3 -mx-6 px-6 scrollbar-hide">
             {genresWithBooks.map((genre) => {
               const active = selectedFilter === genre.id;
               return (
@@ -312,6 +334,7 @@ export default function DiscoverSection() {
                 </button>
               );
             })}
+          </div>
           </div>
         )}
 
