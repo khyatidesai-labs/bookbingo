@@ -58,14 +58,20 @@ Return ONLY a JSON array (no markdown, no code blocks, no explanation) with this
   }
 ]`;
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  const isOpenRouter = apiKey.startsWith("sk-or-");
+  const apiUrl = isOpenRouter
+    ? "https://openrouter.ai/api/v1/chat/completions"
+    : "https://api.openai.com/v1/chat/completions";
+
+  const response = await fetch(apiUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${apiKey}`,
+      ...(isOpenRouter ? { "HTTP-Referer": "https://bookbingo.app", "X-Title": "Book Bingo" } : {}),
     },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model: isOpenRouter ? "openai/gpt-4o-mini" : "gpt-4o-mini",
       messages: [
         {
           role: "system",
