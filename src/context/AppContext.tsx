@@ -59,8 +59,10 @@ interface AppState {
 
   /** Transient UI state — kept here so any component can trigger modals. */
   openedBookId: string | null;
+  dynamicBook: Book | null;
   openBook: (bookId: string) => void;
   closeBook: () => void;
+  setDynamicBook: (book: Book | null) => void;
   savedDrawerOpen: boolean;
   openSavedDrawer: () => void;
   closeSavedDrawer: () => void;
@@ -132,6 +134,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [bingoCards, setBingoCards] = useState<BingoCard[]>([]);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [openedBookId, setOpenedBookId] = useState<string | null>(null);
+  const [dynamicBook, setDynamicBook] = useState<Book | null>(null);
   const [savedDrawerOpen, setSavedDrawerOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [reading, setReading] = useState<CurrentlyReading[]>([]);
@@ -140,7 +143,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [readers, setReaders] = useState<DirectoryReader[]>([]);
 
   const openBook = useCallback((bookId: string) => setOpenedBookId(bookId), []);
-  const closeBook = useCallback(() => setOpenedBookId(null), []);
+  const closeBook = useCallback(() => { setOpenedBookId(null); setDynamicBook(null); }, []);
   const openSavedDrawer = useCallback(() => setSavedDrawerOpen(true), []);
   const closeSavedDrawer = useCallback(() => setSavedDrawerOpen(false), []);
   const openAuthModal = useCallback(() => setAuthModalOpen(true), []);
@@ -535,8 +538,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     mode,
     profile,
     openedBookId,
+    dynamicBook,
     openBook,
     closeBook,
+    setDynamicBook,
     savedDrawerOpen,
     openSavedDrawer,
     closeSavedDrawer,

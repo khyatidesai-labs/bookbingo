@@ -15,8 +15,10 @@ import { AppProvider, useApp } from './context/AppContext';
 import { BOOK_BY_ID } from './data/books';
 
 function GlobalOverlays() {
-  const { openedBookId, closeBook, savedDrawerOpen, closeSavedDrawer } = useApp();
-  const book = openedBookId ? BOOK_BY_ID[openedBookId] ?? null : null;
+  const { openedBookId, closeBook, savedDrawerOpen, closeSavedDrawer, dynamicBook } = useApp();
+  const book = openedBookId
+    ? (BOOK_BY_ID[openedBookId] ?? dynamicBook ?? null)
+    : null;
   return (
     <>
       <BookDetailModal book={book} onClose={closeBook} />

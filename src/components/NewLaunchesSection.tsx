@@ -19,7 +19,7 @@ async function fetchNewReleasesFromEdge(): Promise<Book[]> {
 }
 
 export default function NewLaunchesSection() {
-  const { openBook } = useApp();
+  const { openBook, setDynamicBook } = useApp();
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);

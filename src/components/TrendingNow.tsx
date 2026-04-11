@@ -21,6 +21,7 @@ export default function TrendingNow() {
     toggleMood,
     clearFilters,
     openBook,
+    setDynamicBook,
   } = useApp();
 
   const [books, setBooks] = useState<Book[]>([]);
@@ -149,7 +150,7 @@ export default function TrendingNow() {
                 <BookCard
                   book={book}
                   tag={hasFilters ? 'For you' : 'Trending'}
-                  onClick={() => openBook(book.id)}
+                  onClick={() => { setDynamicBook(book); openBook(book.id); }}
                 />
               </div>
             ))}
