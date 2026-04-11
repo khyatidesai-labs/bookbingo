@@ -1,11 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Compass, Briefcase, Sparkles, Trophy, ChevronRight } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import {
-  fetchBooksByProfession,
-  fetchBooksByMood,
-  searchBooks,
-} from '../lib/openLibraryService';
+import { supabase } from '../lib/supabase';
 import { PROFESSIONS } from '../data/professions';
 import { MOODS } from '../data/moods';
 import { CHALLENGE_BY_ID } from '../data/bingoChallenges';
@@ -24,6 +20,60 @@ const PROFESSION_IMAGES: Record<string, string> = {
   scientist: 'https://images.pexels.com/photos/2280571/pexels-photo-2280571.jpeg?auto=compress&cs=tinysrgb&w=400',
 };
 
+function mapDbBook(row: Record<string, unknown>): Book {
+  return {
+    id: row.id as string,
+    title: row.title as string,
+    author: row.author as string,
+    isbn: '',
+    cover: (row.cover_url as string) || '',
+    description: (row.description as string) || '',
+    pages: (row.page_count as number) || 200,
+    year: (row.year as number) || 0,
+    genres: (row.genres as string[]) || [],
+    moods: (row.mood_tags as string[]) || [],
+    professions: (row.professions as string[]) || [],
+    tags: [],
+  };
+}
+
+async function fetchByProfession(profession: string): Promise<Book[]> {
+  if (!supabase) return [];
+  const { data } = await supabase
+    .from('books')
+    .select('*')
+    .contains('professions', [profession])
+    .order('title')
+    .limit(20);
+  return (data ?? []).map(mapDbBook);
+}
+
+async function fetchByMood(mood: string): Promise<Book[]> {
+  if (!supabase) return [];
+  const { data } = await supabase
+    .from('books')
+    .select('*')
+    .contains('mood_tags', [mood])
+    .order('title')
+    .limit(20);
+  return (data ?? []).map(mapDbBook);
+}
+
+async function fetchByGenreKeywords(keywords: string[]): Promise<Book[]> {
+  if (!supabase) return [];
+  const { data } = await supabase
+    .from('books')
+    .select('*')
+    .overlaps('genres', keywords)
+    .order('title')
+    .limit(20);
+  return (data ?? []).map(mapDbBook);
+}
+
+const CHALLENGE_GENRE_MAP: Record<string, string[]> = {
+  default: ['literary', 'classic', 'nonfiction', 'fantasy', 'scifi', 'thriller', 'mystery'],
+};
+
 export default function DiscoverSection() {
   const { openBook, setDynamicBook } = useApp();
   const [tab, setTab] = useState<Tab>('profession');
@@ -38,11 +88,16 @@ export default function DiscoverSection() {
     setLoading(true);
     const load = async () => {
       let results: Book[] = [];
-      if (tab === 'profession') results = await fetchBooksByProfession(selectedFilter);
-      else if (tab === 'mood') results = await fetchBooksByMood(selectedFilter);
-      else {
+      if (tab === 'profession') {
+        results = await fetchByProfession(selectedFilter);
+      } else if (tab === 'mood') {
+        results = await fetchByMood(selectedFilter);
+      } else {
         const ch = CHALLENGE_BY_ID[selectedFilter];
-        if (ch) results = await searchBooks(ch.label);
+        const keywords = ch
+          ? ch.label.toLowerCase().split(/\s+/).filter((w) => w.length > 3)
+          : CHALLENGE_GENRE_MAP.default;
+        results = await fetchByGenreKeywords(keywords.length ? keywords : CHALLENGE_GENRE_MAP.default);
       }
       setBooks(results);
       setLoading(false);
@@ -71,33 +126,29 @@ export default function DiscoverSection() {
     <section id="discover" className="py-12 bg-white border-t border-primary-100">
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
 
-        {/* Header + tabs inline */}
-        <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Compass size={14} className="text-primary-400" />
-              <h2 className="font-heading text-xl font-bold text-primary-900">Discover</h2>
-            </div>
-            <div className="flex items-center gap-1 bg-primary-50 rounded-xl p-1">
-              {tabs.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => handleTabChange(t.id)}
-                  className={`flex items-center gap-1.5 font-body text-xs font-medium px-3 py-1.5 rounded-lg transition-all ${
-                    tab === t.id
-                      ? 'bg-white text-primary-900 shadow-sm'
-                      : 'text-primary-400 hover:text-primary-700'
-                  }`}
-                >
-                  {t.icon}
-                  {t.label}
-                </button>
-              ))}
-            </div>
+        <div className="flex items-center gap-3 mb-6 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Compass size={14} className="text-primary-400" />
+            <h2 className="font-heading text-xl font-bold text-primary-900">Discover</h2>
+          </div>
+          <div className="flex items-center gap-1 bg-primary-50 rounded-xl p-1">
+            {tabs.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => handleTabChange(t.id)}
+                className={`flex items-center gap-1.5 font-body text-xs font-medium px-3 py-1.5 rounded-lg transition-all ${
+                  tab === t.id
+                    ? 'bg-white text-primary-900 shadow-sm'
+                    : 'text-primary-400 hover:text-primary-700'
+                }`}
+              >
+                {t.icon}
+                {t.label}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Profession chips — horizontal scroll with images */}
         {tab === 'profession' && (
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-6 px-6" style={{ scrollbarWidth: 'none' }}>
             {PROFESSIONS.map((prof) => {
@@ -131,7 +182,6 @@ export default function DiscoverSection() {
           </div>
         )}
 
-        {/* Mood chips — horizontal scroll with images */}
         {tab === 'mood' && (
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-6 px-6" style={{ scrollbarWidth: 'none' }}>
             {MOODS.map((mood) => {
@@ -162,7 +212,6 @@ export default function DiscoverSection() {
           </div>
         )}
 
-        {/* Challenge chips — horizontal scroll */}
         {tab === 'challenge' && (
           <div className="flex gap-2 overflow-x-auto pb-2 -mx-6 px-6 flex-wrap" style={{ scrollbarWidth: 'none' }}>
             {challenges.map((ch) => {
@@ -186,7 +235,6 @@ export default function DiscoverSection() {
           </div>
         )}
 
-        {/* Results */}
         {selectedFilter && (
           <div className="mt-8">
             {loading ? (
@@ -201,13 +249,13 @@ export default function DiscoverSection() {
               </div>
             ) : books.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {books.slice(0, 20).map((book) => (
+                {books.map((book) => (
                   <BookCard key={book.id} book={book} onClick={() => handleBookClick(book)} />
                 ))}
               </div>
             ) : (
               <div className="text-center py-10 bg-primary-50 rounded-2xl">
-                <p className="font-body text-primary-500 text-sm">No books found. Try another selection.</p>
+                <p className="font-body text-primary-500 text-sm">No books found for this selection.</p>
               </div>
             )}
           </div>
