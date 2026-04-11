@@ -1,31 +1,45 @@
 import { useEffect, useState } from 'react';
-import { Flame, Sparkles } from 'lucide-react';
+import { Flame, Sparkles, RefreshCw } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { fetchNewReleases } from '../lib/openLibraryService';
 import BookCard from './BookCard';
 import type { Book } from '../types';
 
-/**
- * New Launches Section
- * Shows the latest books released, fetched from Open Library API
- * Updates weekly to show fresh releases
- */
+const EDGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/new-releases`;
+
+async function fetchNewReleasesFromEdge(): Promise<Book[]> {
+  const res = await fetch(EDGE_URL, {
+    headers: {
+      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!res.ok) throw new Error(`Edge function error: ${res.status}`);
+  const data = await res.json();
+  return (data.books ?? []) as Book[];
+}
+
 export default function NewLaunchesSection() {
   const { openBook } = useApp();
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  const loadNewReleases = async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      const newBooks = await fetchNewReleasesFromEdge();
+      setBooks(newBooks);
+    } catch (err) {
+      console.error('Failed to load new releases:', err);
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadNewReleases = async () => {
-      setLoading(true);
-      const newBooks = await fetchNewReleases();
-      setBooks(newBooks.slice(0, 10)); // Show top 10 new releases
-      setLoading(false);
-    };
-
     loadNewReleases();
-
-    // Refresh every 24 hours
     const interval = setInterval(loadNewReleases, 1000 * 60 * 60 * 24);
     return () => clearInterval(interval);
   }, []);
@@ -56,10 +70,27 @@ export default function NewLaunchesSection() {
 
         {/* Books Grid */}
         {loading ? (
-          <div className="text-center py-16">
-            <p className="font-body text-primary-500">
-              Fetching latest releases from Open Library...
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {Array.from({ length: 10 }).map((_, i) => (
+              <div key={i} className="animate-pulse">
+                <div className="bg-primary-100 rounded-xl aspect-[2/3] mb-3" />
+                <div className="bg-primary-100 rounded h-3 mb-2 w-3/4" />
+                <div className="bg-primary-100 rounded h-3 w-1/2" />
+              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div className="text-center py-16 bg-white rounded-2xl border border-primary-100">
+            <p className="font-body text-primary-500 mb-4">
+              Could not load new releases.
             </p>
+            <button
+              onClick={loadNewReleases}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent-100 text-accent-700 text-sm font-semibold hover:bg-accent-200 transition-colors"
+            >
+              <RefreshCw size={14} />
+              Try again
+            </button>
           </div>
         ) : books.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -74,9 +105,14 @@ export default function NewLaunchesSection() {
           </div>
         ) : (
           <div className="text-center py-16 bg-white rounded-2xl border border-primary-100">
-            <p className="font-body text-primary-500">
-              Could not load new releases. Check your connection.
-            </p>
+            <p className="font-body text-primary-500 mb-4">No new releases found.</p>
+            <button
+              onClick={loadNewReleases}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent-100 text-accent-700 text-sm font-semibold hover:bg-accent-200 transition-colors"
+            >
+              <RefreshCw size={14} />
+              Refresh
+            </button>
           </div>
         )}
 
