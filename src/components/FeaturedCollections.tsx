@@ -1,4 +1,8 @@
-import { ArrowRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ArrowRight, X, ArrowLeft, Loader2 } from 'lucide-react';
+import type { Book } from '../types';
+import { BOOKS } from '../data/books';
+import { fetchBooksWithFallback } from '../lib/bookCache';
 
 const collections = [
   {
@@ -28,11 +32,196 @@ const collections = [
 ];
 
 export default function FeaturedCollections() {
+  const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
+  const [viewingBooks, setViewingBooks] = useState(false);
+  const [books, setBooks] = useState<Book[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [matchedCount, setMatchedCount] = useState(0);
+  const [collectionCounts, setCollectionCounts] = useState<Record<string, number>>({});
+
+  // Calculate matched counts for all collections
+  useEffect(() => {
+    const counts: Record<string, number> = {};
+
+    collections.forEach((collection) => {
+      const count = BOOKS.filter((book) => {
+        const hasMatchingGenre = collection.tags.some((tag) =>
+          book.genres.some((g) => g.toLowerCase().includes(tag.toLowerCase()))
+        );
+        const hasMatchingMood = collection.tags.some((tag) =>
+          book.moods?.some((m) => m.toLowerCase().includes(tag.toLowerCase()))
+        );
+        return hasMatchingGenre || hasMatchingMood;
+      }).length;
+
+      counts[collection.title] = count;
+    });
+
+    setCollectionCounts(counts);
+  }, []);
+
+  // Calculate matched count when collection is selected
+  useEffect(() => {
+    if (!selectedCollection) return;
+
+    const collection = collections.find((c) => c.title === selectedCollection);
+    if (!collection) return;
+
+    const count = collectionCounts[selectedCollection] || 0;
+    setMatchedCount(count);
+  }, [selectedCollection, collectionCounts]);
+
+  const loadBooks = async (collectionTitle: string) => {
+    const collection = collections.find((c) => c.title === collectionTitle);
+    if (!collection) return;
+
+    setLoading(true);
+    try {
+      // First, try to get books from local database
+      let matchedBooks = BOOKS.filter((book) => {
+        const hasMatchingGenre = collection.tags.some((tag) =>
+          book.genres.some((g) => g.toLowerCase().includes(tag.toLowerCase()))
+        );
+        const hasMatchingMood = collection.tags.some((tag) =>
+          book.moods?.some((m) => m.toLowerCase().includes(tag.toLowerCase()))
+        );
+        return hasMatchingGenre || hasMatchingMood;
+      });
+
+      // If no local matches, fetch from Open Library with caching
+      if (matchedBooks.length === 0) {
+        const cacheKey = collectionTitle.toLowerCase().replace(/\s+/g, '-');
+        const fetchedBooks = await fetchBooksWithFallback(collection.tags, cacheKey);
+        matchedBooks = fetchedBooks;
+      }
+
+      setBooks(matchedBooks.slice(0, 8));
+      setViewingBooks(true);
+    } catch (error) {
+      console.error('Failed to load books:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <section
-      className="py-12 relative overflow-hidden"
-      style={{ background: 'linear-gradient(180deg, #0F0B1A 0%, #1A1030 100%)' }}
-    >
+    <>
+      {selectedCollection && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-primary-900/60 backdrop-blur-sm" onClick={() => {
+            setSelectedCollection(null);
+            setViewingBooks(false);
+            setBooks([]);
+          }} />
+          <div className="relative bg-white rounded-3xl shadow-2xl p-8 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+            <button
+              onClick={() => {
+                if (viewingBooks) {
+                  setViewingBooks(false);
+                  setBooks([]);
+                } else {
+                  setSelectedCollection(null);
+                }
+              }}
+              className="absolute top-5 right-5 w-8 h-8 rounded-full bg-primary-100 hover:bg-primary-200 flex items-center justify-center transition-colors"
+            >
+              {viewingBooks ? <ArrowLeft size={14} className="text-primary-600" /> : <X size={14} className="text-primary-600" />}
+            </button>
+
+            {!viewingBooks && collections.find((c) => c.title === selectedCollection) && (
+              <>
+                <img
+                  src={collections.find((c) => c.title === selectedCollection)!.image}
+                  alt={selectedCollection}
+                  className="w-full h-48 object-cover rounded-2xl mb-6"
+                />
+                <h2 className="font-heading text-2xl font-bold text-primary-900 mb-1">
+                  {selectedCollection}
+                </h2>
+                <p className="font-body text-primary-500 text-sm mb-4">
+                  {collections.find((c) => c.title === selectedCollection)!.subtitle}
+                </p>
+                <p className="font-body text-primary-700 text-sm mb-4">
+                  {collections.find((c) => c.title === selectedCollection)!.description}
+                </p>
+                <div className="flex gap-2 flex-wrap mb-6">
+                  {collections.find((c) => c.title === selectedCollection)!.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="font-body text-xs px-3 py-1 rounded-full"
+                      style={{
+                        background: 'rgba(124,58,237,0.15)',
+                        border: '1px solid rgba(124,58,237,0.25)',
+                        color: 'rgba(124,58,237,0.9)',
+                      }}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+                <button
+                  onClick={() => loadBooks(selectedCollection)}
+                  disabled={loading}
+                  className="w-full font-body font-semibold text-sm bg-primary-900 hover:bg-primary-800 disabled:bg-primary-300 text-white py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    `Explore ${matchedCount} Book${matchedCount === 1 ? '' : 's'}`
+                  )}
+                </button>
+              </>
+            )}
+
+            {viewingBooks && (
+              <>
+                <h2 className="font-heading text-2xl font-bold text-primary-900 mb-6">
+                  Books in {selectedCollection}
+                </h2>
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  {books.map((book) => (
+                    <div key={book.id} className="group cursor-pointer">
+                      <div className="relative aspect-[2/3] rounded-lg overflow-hidden mb-2 bg-primary-100">
+                        {book.cover ? (
+                          <img
+                            src={book.cover}
+                            alt={book.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary-100 to-primary-200">
+                            <span className="text-3xl font-bold text-primary-300">
+                              {book.title[0]}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <h3 className="font-heading font-semibold text-primary-900 text-xs line-clamp-2 mb-1">
+                        {book.title}
+                      </h3>
+                      <p className="font-body text-[10px] text-primary-500">
+                        {book.author}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                {books.length === 0 && !loading && (
+                  <p className="text-center text-primary-500 py-8">
+                    No books found for this collection.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+      <section
+        className="py-12 relative overflow-hidden"
+        style={{ background: 'linear-gradient(180deg, #0F0B1A 0%, #1A1030 100%)' }}
+      >
       <div className="absolute inset-0 pointer-events-none">
         <div
           className="absolute top-0 left-0 right-0 h-px"
@@ -56,7 +245,8 @@ export default function FeaturedCollections() {
           {collections.map((col) => (
             <button
               key={col.title}
-              className="group relative rounded-2xl overflow-hidden text-left transition-all duration-300 hover:-translate-y-1.5"
+              onClick={() => setSelectedCollection(col.title)}
+              className="group relative rounded-2xl overflow-hidden text-left transition-all duration-300 hover:-translate-y-1.5 cursor-pointer"
               style={{
                 border: '1px solid rgba(124,58,237,0.18)',
                 background: 'rgba(29,16,56,0.6)',
@@ -101,7 +291,7 @@ export default function FeaturedCollections() {
                     ))}
                   </div>
                   <span className="flex items-center gap-1 font-body text-[10px] font-semibold text-primary-400 group-hover:text-primary-300 transition-colors">
-                    {col.bookCount}
+                    {collectionCounts[col.title] ?? col.bookCount}
                     <ArrowRight size={11} className="group-hover:translate-x-0.5 transition-transform" />
                   </span>
                 </div>
@@ -111,5 +301,6 @@ export default function FeaturedCollections() {
         </div>
       </div>
     </section>
+    </>
   );
 }

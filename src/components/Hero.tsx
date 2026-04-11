@@ -13,7 +13,7 @@ export default function Hero() {
     if (reading.length >= 3) {
       return reading.slice(0, 3).map((r) => BOOKS.find((b) => b.id === r.bookId)!).filter(Boolean);
     }
-    const picks = ['atomic-habits-clear', 'sapiens-harari', 'pragmatic-thinking-and-learning-hunt'];
+    const picks = ['atomic-habits-clear', 'sapiens-harari', 'the-pragmatic-programmer-thomas'];
     const resolved = picks.map((id) => BOOKS.find((b) => b.id === id)).filter(Boolean) as typeof BOOKS;
     return resolved.length === 3 ? resolved : BOOKS.slice(0, 3);
   })();

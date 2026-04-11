@@ -21,6 +21,10 @@ export default function ReadingShelf() {
   const currentBook = firstReading
     ? (BOOK_BY_ID[firstReading.bookId] ?? (dynamicBook?.id === firstReading.bookId ? dynamicBook : null))
     : null;
+
+  // Fallback: if we have a reading entry but no book in the database, show a placeholder
+  const hasReadingEntry = Boolean(firstReading && !currentBook);
+
   const topRec = inbox[0];
   const topRecBook = topRec ? BOOK_BY_ID[topRec.bookId] : null;
 
@@ -82,6 +86,11 @@ export default function ReadingShelf() {
                   <p className="font-body text-[10px] text-white/40 mt-1.5">In progress · tap to open</p>
                 </div>
               </button>
+            ) : hasReadingEntry ? (
+              <div className="flex flex-col items-start justify-center h-full py-2">
+                <p className="font-heading font-semibold text-white text-sm">Book loading...</p>
+                <p className="font-body text-white/45 text-[11px] mt-1 leading-snug">Syncing your reading status. Check back in a moment.</p>
+              </div>
             ) : (
               <EmptyBlock title="Nothing in progress" sub="Open any book and tap &ldquo;I'm reading&rdquo; to track it here." />
             )}
