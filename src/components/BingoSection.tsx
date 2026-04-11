@@ -8,7 +8,7 @@ import BookPickerModal from './BookPickerModal';
 import type { BingoChallenge, Book } from '../types';
 
 /**
- * Real 5x5 Book Bingo card. Each square is a reading challenge. Clicking a
+ * Book Bingo card (3x5 = 15 squares). Each square is a reading challenge. Clicking a
  * square opens a picker showing books from the catalogue that satisfy it —
  * picking one marks the square complete and adds the book to the reading list.
  */
@@ -32,6 +32,18 @@ export default function BingoSection() {
   const winningCells = useMemo(() => getWinningCells(squares), [squares]);
   const bingos = useMemo(() => countBingos(squares), [squares]);
   const progress = useMemo(() => bingoProgress(squares), [squares]);
+
+  // Group cards by month
+  const cardsByMonth = useMemo(() => {
+    const groups: { [key: string]: typeof bingoCards } = {};
+    bingoCards.forEach((card) => {
+      const date = new Date(card.createdAt);
+      const monthKey = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+      if (!groups[monthKey]) groups[monthKey] = [];
+      groups[monthKey].push(card);
+    });
+    return groups;
+  }, [bingoCards]);
 
   const handleSquareClick = (idx: number) => {
     if (!activeCard) return;
@@ -76,23 +88,34 @@ export default function BingoSection() {
               Each square is a reading challenge. Tap a square, pick a matching book, and watch the card light up.
             </p>
 
-            {/* Card management */}
-            <div className="space-y-3 mb-6">
+            {/* Card management - grouped by month */}
+            <div className="space-y-4 mb-6">
               {ready && bingoCards.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {bingoCards.map((card) => (
-                    <button
-                      key={card.id}
-                      onClick={() => setActiveCard(card.id)}
-                      className={`font-body text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
-                        card.id === activeCardId
-                          ? 'bg-primary-900 text-white border-primary-900'
-                          : 'bg-white text-primary-600 border-primary-200 hover:border-primary-400'
-                      }`}
-                    >
-                      {card.title}
-                    </button>
-                  ))}
+                <div className="space-y-3">
+                  {Object.entries(cardsByMonth)
+                    .reverse()
+                    .map(([month, cards]) => (
+                      <div key={month}>
+                        <p className="font-body text-[10px] font-semibold text-primary-500 uppercase tracking-wider mb-2">
+                          {month}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {cards.map((card) => (
+                            <button
+                              key={card.id}
+                              onClick={() => setActiveCard(card.id)}
+                              className={`font-body text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
+                                card.id === activeCardId
+                                  ? 'bg-primary-900 text-white border-primary-900'
+                                  : 'bg-white text-primary-600 border-primary-200 hover:border-primary-400'
+                              }`}
+                            >
+                              {card.title}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
                 </div>
               )}
               <div className="flex gap-2">
@@ -181,7 +204,7 @@ export default function BingoSection() {
                       </span>
                     </div>
                     <span className="font-body text-white/50 text-xs">
-                      {progress.done}/25
+                      {progress.done}/15
                     </span>
                   </div>
 

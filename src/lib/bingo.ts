@@ -2,21 +2,22 @@ import type { Book, BingoCard, BingoChallenge, BingoSquare } from '../types';
 import { BOOK_BY_ID } from '../data/books';
 import { CHALLENGES, CHALLENGE_BY_ID } from '../data/bingoChallenges';
 
-/** Length 25, row-major indices of a 5x5 grid. */
-export const GRID_SIZE = 5;
-export const GRID_CELLS = GRID_SIZE * GRID_SIZE;
+/** Length 15, row-major indices of a 3x5 grid (3 rows, 5 columns). */
+export const GRID_SIZE_ROWS = 3;
+export const GRID_SIZE_COLS = 5;
+export const GRID_CELLS = GRID_SIZE_ROWS * GRID_SIZE_COLS;
 
-/** Rows, columns, and diagonals as arrays of cell indices. */
+/** Rows and columns as arrays of cell indices (3x5 grid - no diagonals with non-square grid). */
 export const WINNING_LINES: number[][] = (() => {
   const lines: number[][] = [];
-  for (let r = 0; r < GRID_SIZE; r++) {
-    lines.push(Array.from({ length: GRID_SIZE }, (_, c) => r * GRID_SIZE + c));
+  // All rows (3)
+  for (let r = 0; r < GRID_SIZE_ROWS; r++) {
+    lines.push(Array.from({ length: GRID_SIZE_COLS }, (_, c) => r * GRID_SIZE_COLS + c));
   }
-  for (let c = 0; c < GRID_SIZE; c++) {
-    lines.push(Array.from({ length: GRID_SIZE }, (_, r) => r * GRID_SIZE + c));
+  // All columns (5)
+  for (let c = 0; c < GRID_SIZE_COLS; c++) {
+    lines.push(Array.from({ length: GRID_SIZE_ROWS }, (_, r) => r * GRID_SIZE_COLS + c));
   }
-  lines.push(Array.from({ length: GRID_SIZE }, (_, i) => i * GRID_SIZE + i));
-  lines.push(Array.from({ length: GRID_SIZE }, (_, i) => i * GRID_SIZE + (GRID_SIZE - 1 - i)));
   return lines;
 })();
 

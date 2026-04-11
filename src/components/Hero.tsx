@@ -10,7 +10,7 @@ import { getOptimizedImageProps } from '../lib/imageOptimization';
  * hero itself becomes a browse surface.
  */
 export default function Hero() {
-  const { openBook, reading } = useApp();
+  const { openBook, reading, readers } = useApp();
 
   const scrollTo = (id: string) =>
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
@@ -56,7 +56,7 @@ export default function Hero() {
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
               </span>
               <span className="font-body text-white/80 text-[11px] font-medium tracking-wide">
-                248 readers online now
+                {readers.length} {readers.length === 1 ? 'reader' : 'readers'} online now
               </span>
             </div>
 

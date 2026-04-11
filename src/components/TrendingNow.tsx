@@ -1,17 +1,21 @@
 import { TrendingUp, Sparkles, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { PROFESSION_BY_ID } from '../data/professions';
 import { MOOD_BY_ID } from '../data/moods';
+import { fetchTrendingBooks, fetchBooksByProfession, fetchBooksByMood } from '../lib/openLibraryService';
 import BookCard from './BookCard';
+import type { Book } from '../types';
 
 /**
  * Trending / recommendations section. Horizontal-scroll rail with snap,
  * an inline filter chip row that reflects the active profession + moods
  * and lets the user clear each with one tap, and a compact header.
+ *
+ * Now fetches books dynamically from Open Library API with working cover images.
  */
 export default function TrendingNow() {
   const {
-    recommendations,
     selectedProfession,
     selectedMoods,
     setProfession,
@@ -20,8 +24,47 @@ export default function TrendingNow() {
     openBook,
   } = useApp();
 
+  const [books, setBooks] = useState<Book[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const hasFilters = Boolean(selectedProfession || selectedMoods.length);
   const activeProfession = selectedProfession ? PROFESSION_BY_ID[selectedProfession] : null;
+
+  // Fetch trending or filtered books
+  useEffect(() => {
+    setLoading(true);
+    const loadBooks = async () => {
+      let fetchedBooks: Book[] = [];
+
+      if (selectedProfession || selectedMoods.length > 0) {
+        // If filters are active, combine results from profession and moods
+        const profBooks = selectedProfession
+          ? await fetchBooksByProfession(selectedProfession)
+          : [];
+        const moodBooks = selectedMoods.length > 0
+          ? await Promise.all(selectedMoods.map(m => fetchBooksByMood(m)))
+              .then(results => results.flat())
+          : [];
+
+        // Combine and deduplicate
+        const combined = [...profBooks, ...moodBooks];
+        const seen = new Set<string>();
+        fetchedBooks = combined.filter(b => {
+          if (seen.has(b.id)) return false;
+          seen.add(b.id);
+          return true;
+        });
+      } else {
+        // No filters, show trending books
+        fetchedBooks = await fetchTrendingBooks();
+      }
+
+      setBooks(fetchedBooks);
+      setLoading(false);
+    };
+
+    loadBooks();
+  }, [selectedProfession, selectedMoods]);
 
   return (
     <section id="trending" className="py-8 bg-[#F8FAFC]">
@@ -76,10 +119,16 @@ export default function TrendingNow() {
           )}
         </div>
 
-        {recommendations.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-14">
+            <p className="font-body text-primary-500">
+              Loading from Open Library...
+            </p>
+          </div>
+        ) : books.length === 0 ? (
           <div className="text-center py-14 bg-white rounded-2xl border border-primary-100">
             <p className="font-heading font-semibold text-primary-700">
-              No matches for that combination yet.
+              No matches for that combination.
             </p>
             <p className="font-body text-primary-500 text-sm mt-1">
               Try removing a mood or switching profession.
@@ -90,11 +139,11 @@ export default function TrendingNow() {
             className="flex gap-4 overflow-x-auto pb-4 -mx-6 px-6 snap-x snap-mandatory"
             style={{ scrollbarWidth: 'none' }}
           >
-            {recommendations.map(({ book, reasons }) => (
+            {books.slice(0, 7).map((book) => (
               <div key={book.id} className="snap-start">
                 <BookCard
                   book={book}
-                  tag={reasons[0] ?? 'Trending'}
+                  tag={hasFilters ? 'For you' : 'Trending'}
                   onClick={() => openBook(book.id)}
                 />
               </div>

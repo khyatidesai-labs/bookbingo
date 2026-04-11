@@ -59,7 +59,7 @@ export default function ReadingShelf() {
         <div className="grid md:grid-cols-3 gap-4">
           {/* --- Card 1: Now Reading ----------------------------------- */}
           <ShelfCard
-            tint="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-400/20"
+            tint="bg-gradient-to-br from-emerald-500/30 to-emerald-600/25 border-emerald-400/60"
             icon={<BookOpen size={14} className="text-emerald-300" />}
             label="Now reading"
             badge={reading.length > 0 ? `${reading.length}` : undefined}
@@ -101,7 +101,7 @@ export default function ReadingShelf() {
 
           {/* --- Card 2: Inbox ------------------------------------------ */}
           <ShelfCard
-            tint="bg-gradient-to-br from-rose-500/10 to-rose-500/5 border-rose-400/20"
+            tint="bg-gradient-to-br from-rose-500/30 to-rose-600/25 border-rose-400/60"
             icon={<Inbox size={14} className="text-rose-300" />}
             label="From friends"
             badge={unreadCount > 0 ? `${unreadCount} new` : undefined}
@@ -168,7 +168,7 @@ export default function ReadingShelf() {
 
           {/* --- Card 3: Readers ---------------------------------------- */}
           <ShelfCard
-            tint="bg-gradient-to-br from-accent-500/10 to-accent-500/5 border-accent-400/20"
+            tint="bg-gradient-to-br from-accent-500/30 to-accent-600/25 border-accent-400/60"
             icon={<Users size={14} className="text-accent-300" />}
             label="Readers online"
             badge={readers.length > 0 ? `${readers.length}` : undefined}
@@ -239,7 +239,7 @@ function ShelfCard({
     >
       <div className="flex items-center gap-1.5 mb-3">
         {icon}
-        <span className="font-body text-[10px] font-semibold text-white/70 uppercase tracking-[0.15em]">
+        <span className="font-body text-[10px] font-semibold text-white uppercase tracking-[0.15em]">
           {label}
         </span>
         {badge && (

@@ -1,7 +1,9 @@
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import ReadingShelf from './components/ReadingShelf';
+import NewLaunchesSection from './components/NewLaunchesSection';
 import TrendingNow from './components/TrendingNow';
+import DiscoverSection from './components/DiscoverSection';
 import ProfessionCategories from './components/ProfessionCategories';
 import MoodSection from './components/MoodSection';
 import BingoSection from './components/BingoSection';
@@ -33,7 +35,9 @@ export default function App() {
         <Navbar />
         <Hero />
         <ReadingShelf />
+        <NewLaunchesSection />
         <TrendingNow />
+        <DiscoverSection />
         <ProfessionCategories />
         <MoodSection />
         <BingoSection />
