@@ -1,6 +1,10 @@
-import { BookOpen, Inbox, Users, Send, ArrowRight } from 'lucide-react';
+import { BookOpen, Inbox, Users, Send, ArrowRight, ChevronLeft, ChevronRight, X, BookMarked } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { BOOK_BY_ID } from '../data/books';
+import { listMyReading } from '../lib/storage';
+import type { CurrentlyReading } from '../types';
+import type { DirectoryReader } from '../lib/storage';
 
 export default function ReadingShelf() {
   const {
@@ -14,19 +18,61 @@ export default function ReadingShelf() {
     profile,
     respondToRec,
     dynamicBook,
+    toggleReading,
   } = useApp();
 
   const signedIn = Boolean(profile?.email);
   const firstReading = reading[0];
-  const currentBook = firstReading
-    ? (BOOK_BY_ID[firstReading.bookId] ?? (dynamicBook?.id === firstReading.bookId ? dynamicBook : null))
-    : null;
 
   // Fallback: if we have a reading entry but no book in the database, show a placeholder
-  const hasReadingEntry = Boolean(firstReading && !currentBook);
+  const hasReadingEntry = Boolean(firstReading && !BOOK_BY_ID[firstReading?.bookId ?? '']);
 
   const topRec = inbox[0];
   const topRecBook = topRec ? BOOK_BY_ID[topRec.bookId] : null;
+
+  // State for scrolling through recommendations and reading books
+  const [currentRecIndex, setCurrentRecIndex] = useState(0);
+  const [currentReadingIndex, setCurrentReadingIndex] = useState(0);
+
+  // State for reader profile popup
+  const [selectedReader, setSelectedReader] = useState<DirectoryReader | null>(null);
+  const [readerBooks, setReaderBooks] = useState<CurrentlyReading[]>([]);
+  const [loadingReaderBooks, setLoadingReaderBooks] = useState(false);
+
+  const validRecs = inbox.filter((rec) => BOOK_BY_ID[rec.bookId]);
+  const currentRec = validRecs[currentRecIndex];
+  const currentRecBook = currentRec ? BOOK_BY_ID[currentRec.bookId] : null;
+
+  // Get all reading entries with valid books
+  const validReadingBooks = reading
+    .map((r) => ({
+      entry: r,
+      book: BOOK_BY_ID[r.bookId] ?? (dynamicBook?.id === r.bookId ? dynamicBook : null),
+    }))
+    .filter(({ book }) => book);
+
+  const currentReadingItem = validReadingBooks[currentReadingIndex];
+  const currentReadingBook = currentReadingItem?.book ?? null;
+
+  const handleReaderClick = useCallback(async (reader: DirectoryReader) => {
+    setSelectedReader(reader);
+    setReaderBooks([]);
+    setLoadingReaderBooks(true);
+    try {
+      const books = await listMyReading(reader.id);
+      setReaderBooks(books);
+    } finally {
+      setLoadingReaderBooks(false);
+    }
+  }, []);
+
+  // Close reader popup on Escape
+  useEffect(() => {
+    if (!selectedReader) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedReader(null); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [selectedReader]);
 
   return (
     <section
@@ -62,30 +108,68 @@ export default function ReadingShelf() {
         </div>
 
         <div className="grid md:grid-cols-3 gap-4">
+          {/* Now Reading */}
           <ShelfCard
             tint="from-emerald-600/20 to-emerald-500/10"
             borderColor="rgba(16,185,129,0.25)"
             icon={<BookOpen size={14} className="text-emerald-400" />}
             label="Now reading"
-            badge={reading.length > 0 ? `${reading.length}` : undefined}
+            badge={validReadingBooks.length > 0 ? `${validReadingBooks.length}` : undefined}
           >
-            {currentBook ? (
-              <button onClick={() => openBook(currentBook.id)} className="w-full flex gap-3 text-left group">
-                <div
-                  className="w-14 h-20 rounded-lg overflow-hidden flex-none shadow-lg group-hover:scale-[1.03] transition-transform"
-                  style={{ border: '1px solid rgba(167,139,250,0.2)' }}
-                >
-                  <img src={currentBook.cover} alt="" className="w-full h-full object-cover" />
+            {validReadingBooks.length > 0 && currentReadingBook ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-body text-[9px] text-emerald-400 font-semibold uppercase tracking-wider">
+                    {currentReadingIndex + 1} of {validReadingBooks.length}
+                  </span>
+                  {validReadingBooks.length > 1 && (
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => setCurrentReadingIndex((i) => (i - 1 + validReadingBooks.length) % validReadingBooks.length)}
+                        className="p-1 rounded hover:bg-emerald-500/20 transition-colors"
+                        aria-label="Previous book"
+                      >
+                        <ChevronLeft size={12} className="text-emerald-400" />
+                      </button>
+                      <button
+                        onClick={() => setCurrentReadingIndex((i) => (i + 1) % validReadingBooks.length)}
+                        className="p-1 rounded hover:bg-emerald-500/20 transition-colors"
+                        aria-label="Next book"
+                      >
+                        <ChevronRight size={12} className="text-emerald-400" />
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-heading font-bold text-white text-sm leading-tight line-clamp-2">{currentBook.title}</p>
-                  <p className="font-body text-white/50 text-[11px] mt-0.5 truncate">{currentBook.author}</p>
-                  <div className="mt-2 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
-                    <div className="h-full w-1/3 rounded-full" style={{ background: 'linear-gradient(90deg, #10B981, #34D399)' }} />
+                <button onClick={() => openBook(currentReadingBook.id)} className="w-full flex gap-3 text-left group">
+                  <div
+                    className="w-14 h-20 rounded-lg overflow-hidden flex-none shadow-lg group-hover:scale-[1.03] transition-transform"
+                    style={{ border: '1px solid rgba(167,139,250,0.2)' }}
+                  >
+                    <img src={currentReadingBook.cover} alt="" className="w-full h-full object-cover" />
                   </div>
-                  <p className="font-body text-[10px] text-white/40 mt-1.5">In progress · tap to open</p>
-                </div>
-              </button>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-heading font-bold text-white text-sm leading-tight line-clamp-2">{currentReadingBook.title}</p>
+                    <p className="font-body text-white/50 text-[11px] mt-0.5 truncate">{currentReadingBook.author}</p>
+                    <div className="mt-2 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
+                      <div className="h-full w-1/3 rounded-full" style={{ background: 'linear-gradient(90deg, #10B981, #34D399)' }} />
+                    </div>
+                    <p className="font-body text-[10px] text-white/40 mt-1.5">In progress · tap to open</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => {
+                    void toggleReading(currentReadingBook.id);
+                    if (validReadingBooks.length > 1) {
+                      setCurrentReadingIndex((i) => Math.min(i, validReadingBooks.length - 2));
+                    }
+                  }}
+                  className="w-full font-body text-[11px] font-semibold py-1.5 rounded-lg text-white/70 hover:text-white transition-colors"
+                  style={{ border: '1px solid rgba(16,185,129,0.25)' }}
+                >
+                  Finished reading
+                </button>
+              </div>
             ) : hasReadingEntry ? (
               <div className="flex flex-col items-start justify-center h-full py-2">
                 <p className="font-heading font-semibold text-white text-sm">Book loading...</p>
@@ -96,6 +180,7 @@ export default function ReadingShelf() {
             )}
           </ShelfCard>
 
+          {/* From Friends */}
           <ShelfCard
             tint="from-pink-500/20 to-pink-400/10"
             borderColor="rgba(236,72,153,0.25)"
@@ -104,39 +189,73 @@ export default function ReadingShelf() {
             badge={unreadCount > 0 ? `${unreadCount} new` : undefined}
             badgeTone={unreadCount > 0 ? 'hot' : undefined}
           >
-            {topRec && topRecBook ? (
+            {validRecs.length > 0 && currentRecBook ? (
               <div className="space-y-2">
-                <button onClick={() => openBook(topRecBook.id)} className="w-full flex gap-3 text-left group">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-body text-[9px] text-pink-400 font-semibold uppercase tracking-wider">
+                    {currentRecIndex + 1} of {validRecs.length}
+                  </span>
+                  {validRecs.length > 1 && (
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => setCurrentRecIndex((i) => (i - 1 + validRecs.length) % validRecs.length)}
+                        className="p-1 rounded hover:bg-pink-500/20 transition-colors"
+                        aria-label="Previous recommendation"
+                      >
+                        <ChevronLeft size={12} className="text-pink-400" />
+                      </button>
+                      <button
+                        onClick={() => setCurrentRecIndex((i) => (i + 1) % validRecs.length)}
+                        className="p-1 rounded hover:bg-pink-500/20 transition-colors"
+                        aria-label="Next recommendation"
+                      >
+                        <ChevronRight size={12} className="text-pink-400" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <button onClick={() => openBook(currentRecBook.id)} className="w-full flex gap-3 text-left group">
                   <div
                     className="w-14 h-20 rounded-lg overflow-hidden flex-none shadow-lg group-hover:scale-[1.03] transition-transform"
                     style={{ border: '1px solid rgba(167,139,250,0.2)' }}
                   >
-                    <img src={topRecBook.cover} alt="" className="w-full h-full object-cover" />
+                    <img src={currentRecBook.cover} alt="" className="w-full h-full object-cover" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="font-body text-[10px] text-pink-400 font-semibold uppercase tracking-wider">{topRec.fromName} sent</p>
-                    <p className="font-heading font-bold text-white text-sm leading-tight line-clamp-2 mt-0.5">{topRecBook.title}</p>
-                    {topRec.note && (
-                      <p className="font-body text-white/50 text-[11px] italic mt-1 line-clamp-2">&ldquo;{topRec.note}&rdquo;</p>
+                    <p className="font-body text-[10px] text-pink-400 font-semibold uppercase tracking-wider">{currentRec.fromName} sent</p>
+                    <p className="font-heading font-bold text-white text-sm leading-tight line-clamp-2 mt-0.5">{currentRecBook.title}</p>
+                    {currentRec.note && (
+                      <p className="font-body text-white/50 text-[11px] italic mt-1 line-clamp-2">&ldquo;{currentRec.note}&rdquo;</p>
                     )}
                   </div>
                 </button>
                 <div className="flex gap-1.5">
                   <button
-                    onClick={() => respondToRec(topRec.id, 'saved')}
+                    onClick={() => {
+                      respondToRec(currentRec.id, 'saved');
+                      if (validRecs.length > 1) setCurrentRecIndex((i) => (i + 1) % validRecs.length);
+                    }}
                     className="flex-1 font-body text-[11px] font-semibold py-1.5 rounded-lg text-white"
                     style={{ background: 'linear-gradient(135deg, #7C3AED, #A855F7)' }}
                   >
-                    Save to list
+                    Save
                   </button>
                   <button
-                    onClick={openSavedDrawer}
-                    className="font-body text-[11px] font-medium py-1.5 px-2.5 rounded-lg text-white/60 hover:text-white transition-colors"
+                    onClick={() => {
+                      respondToRec(currentRec.id, 'dismissed');
+                      if (validRecs.length > 1) setCurrentRecIndex((i) => (i + 1) % validRecs.length);
+                    }}
+                    className="flex-1 font-body text-[11px] font-semibold py-1.5 rounded-lg text-white/70 hover:text-white transition-colors"
                     style={{ border: '1px solid rgba(124,58,237,0.25)' }}
                   >
-                    View all
+                    Pass
                   </button>
                 </div>
+              </div>
+            ) : topRec && !topRecBook ? (
+              <div className="flex flex-col items-start justify-center h-full py-2">
+                <p className="font-heading font-semibold text-white text-sm">Recommendation loading...</p>
+                <p className="font-body text-white/45 text-[11px] mt-1 leading-snug">From {topRec.fromName}. Syncing book details. Check back in a moment.</p>
               </div>
             ) : (
               <EmptyBlock
@@ -147,6 +266,7 @@ export default function ReadingShelf() {
             )}
           </ShelfCard>
 
+          {/* Readers Online */}
           <ShelfCard
             tint="from-primary-600/20 to-primary-500/10"
             borderColor="rgba(124,58,237,0.3)"
@@ -155,17 +275,18 @@ export default function ReadingShelf() {
             badge={readers.length > 0 ? `${readers.length}` : undefined}
           >
             {readers.length > 0 ? (
-              <div>
+              <div className="relative">
                 <div className="flex flex-wrap gap-1.5 mb-3">
                   {readers.slice(0, 8).map((r) => (
-                    <span
+                    <button
                       key={r.id}
-                      title={`${r.name} · ${r.email}`}
-                      className="w-8 h-8 rounded-full text-white text-[11px] font-bold flex items-center justify-center shadow-md ring-2"
-                      style={{ background: 'linear-gradient(135deg, #7C3AED, #C084FC)', boxShadow: '0 2px 8px rgba(124,58,237,0.4)', ringColor: 'rgba(15,11,26,0.8)' }}
+                      onClick={() => handleReaderClick(r)}
+                      title={`${r.name} — click to see what they're reading`}
+                      className="w-8 h-8 rounded-full text-white text-[11px] font-bold flex items-center justify-center shadow-md transition-transform hover:scale-110 hover:ring-2 hover:ring-purple-400"
+                      style={{ background: 'linear-gradient(135deg, #7C3AED, #C084FC)', boxShadow: '0 2px 8px rgba(124,58,237,0.4)' }}
                     >
                       {r.name.slice(0, 1).toUpperCase()}
-                    </span>
+                    </button>
                   ))}
                   {readers.length > 8 && (
                     <span className="w-8 h-8 rounded-full text-white/60 text-[10px] font-semibold flex items-center justify-center" style={{ background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.3)' }}>
@@ -173,8 +294,71 @@ export default function ReadingShelf() {
                     </span>
                   )}
                 </div>
+
+                {/* Reader profile popup */}
+                {selectedReader && (
+                  <div
+                    className="absolute inset-x-0 top-0 rounded-xl p-3 z-10"
+                    style={{ background: 'rgba(15,11,26,0.97)', border: '1px solid rgba(124,58,237,0.35)', backdropFilter: 'blur(12px)' }}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <span
+                        className="w-8 h-8 rounded-full text-white text-[11px] font-bold flex items-center justify-center flex-none"
+                        style={{ background: 'linear-gradient(135deg, #7C3AED, #C084FC)' }}
+                      >
+                        {selectedReader.name.slice(0, 1).toUpperCase()}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-heading font-bold text-white text-xs truncate">{selectedReader.name}</p>
+                        <p className="font-body text-white/40 text-[10px] truncate">{selectedReader.email}</p>
+                      </div>
+                      <button
+                        onClick={() => setSelectedReader(null)}
+                        className="text-white/40 hover:text-white transition-colors flex-none"
+                        aria-label="Close"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+
+                    <p className="font-body text-[9px] font-semibold text-primary-400 uppercase tracking-wider mb-1.5">
+                      Currently reading
+                    </p>
+
+                    {loadingReaderBooks ? (
+                      <p className="font-body text-[11px] text-white/40">Loading...</p>
+                    ) : readerBooks.length === 0 ? (
+                      <p className="font-body text-[11px] text-white/40">Nothing tracked yet.</p>
+                    ) : (
+                      <ul className="space-y-1.5 max-h-28 overflow-y-auto">
+                        {readerBooks.map((rb) => {
+                          const book = BOOK_BY_ID[rb.bookId];
+                          if (!book) return null;
+                          return (
+                            <li key={rb.bookId}>
+                              <button
+                                onClick={() => { openBook(book.id); setSelectedReader(null); }}
+                                className="w-full flex items-center gap-2 text-left hover:bg-primary-800/40 rounded-lg px-1 py-1 transition-colors"
+                              >
+                                <div className="w-6 h-9 rounded flex-none overflow-hidden" style={{ background: 'rgba(124,58,237,0.2)' }}>
+                                  <img src={book.cover} alt="" className="w-full h-full object-cover" />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-heading font-semibold text-white text-[11px] leading-tight line-clamp-1">{book.title}</p>
+                                  <p className="font-body text-white/40 text-[10px] truncate">{book.author}</p>
+                                </div>
+                                <BookMarked size={10} className="text-primary-400 flex-none ml-auto" />
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
                 <p className="font-body text-[11px] text-white/50 leading-snug mb-3">
-                  Tap a book to see who's reading it, or open any title to send a recommendation.
+                  Tap an avatar to see what they're reading.
                 </p>
                 <button
                   onClick={openSavedDrawer}

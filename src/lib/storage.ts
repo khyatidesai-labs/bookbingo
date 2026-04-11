@@ -30,6 +30,13 @@ export function getStorageMode(): StorageMode {
   return mode;
 }
 
+/** Called by AppContext when custom auth is used so storage operations
+ *  use the correct user id (custom auth bypasses Supabase auth events). */
+export function setCurrentUser(userId: string, m: StorageMode): void {
+  currentUserId = userId;
+  mode = m;
+}
+
 // Keep the module in sync with Supabase's auth state. Without this, a user
 // who starts in local fallback (because anon sign-ins are disabled) and
 // later signs in with username/password would stay in `mode = 'local'` — and every
@@ -641,21 +648,23 @@ export async function sendRecommendation(params: {
   note: string;
   fromName: string;
 }): Promise<BookRecommendation> {
+  const uid = currentUserId ?? 'local';
+  const rec: BookRecommendation = {
+    id: `local-${crypto.randomUUID()}`,
+    fromUser: uid,
+    fromName: params.fromName,
+    toUser: params.toUserId ?? params.toEmail ?? 'local',
+    bookId: params.bookId,
+    note: params.note,
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+  };
+
   if (mode === 'local' || !supabase || !currentUserId) {
-    // Local fallback: echo it back into our own inbox so the sender
-    // can see what would have been sent.
-    const rec: BookRecommendation = {
-      id: `local-${crypto.randomUUID()}`,
-      fromUser: currentUserId ?? 'local',
-      fromName: params.fromName,
-      toUser: params.toUserId ?? params.toEmail ?? 'local',
-      bookId: params.bookId,
-      note: params.note,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-    };
-    const inbox = readLocalRecs(currentUserId ?? 'local');
-    writeLocalRecs(currentUserId ?? 'local', [rec, ...inbox]);
+    // Local fallback: save to recipient's local inbox (or own inbox for testing).
+    const recipientId = params.toUserId ?? uid;
+    const inbox = readLocalRecs(recipientId);
+    writeLocalRecs(recipientId, [rec, ...inbox]);
     return rec;
   }
 
@@ -672,6 +681,12 @@ export async function sendRecommendation(params: {
   }
   if (!toUser) throw new Error('No recipient specified');
 
+  // Always save to recipient's local inbox as backup.
+  const localRec = { ...rec, toUser };
+  const inbox = readLocalRecs(toUser);
+  writeLocalRecs(toUser, [localRec, ...inbox]);
+
+  // Try to persist to Supabase; if the table is missing fall back gracefully.
   const { data, error } = await supabase
     .from('book_recommendations')
     .insert({
@@ -683,7 +698,10 @@ export async function sendRecommendation(params: {
     })
     .select('*')
     .single();
-  if (error || !data) throw new Error(error?.message ?? 'Failed to send recommendation');
+  if (error || !data) {
+    // Supabase write failed (e.g. table missing) — local backup already saved.
+    return localRec;
+  }
 
   return rowToRec(data, params.fromName);
 }
@@ -694,9 +712,11 @@ export async function listInbox(userId: string): Promise<BookRecommendation[]> {
     .from('book_recommendations')
     .select('id, from_user, to_user, book_id, note, status, created_at, profiles!book_recommendations_from_user_fkey(name)')
     .eq('to_user', userId)
+    .eq('status', 'pending')
     .order('created_at', { ascending: false })
     .limit(100);
-  if (error || !data) return [];
+  // Fall back to localStorage if Supabase table is missing or returns nothing.
+  if (error || !data || data.length === 0) return readLocalRecs(userId);
   return data.map((r: Record<string, unknown>) =>
     rowToRec(r, (r.profiles as { name?: string } | undefined)?.name ?? 'A reader'),
   );
@@ -718,13 +738,11 @@ export async function updateRecommendationStatus(
   id: string,
   status: 'saved' | 'dismissed',
 ): Promise<void> {
-  if (mode === 'local' || !supabase || !currentUserId) {
-    const inbox = readLocalRecs(currentUserId ?? 'local').map((r) =>
-      r.id === id ? { ...r, status } : r,
-    );
-    writeLocalRecs(currentUserId ?? 'local', inbox);
-    return;
-  }
+  const uid = currentUserId ?? 'local';
+  // Always update localStorage backup.
+  const inbox = readLocalRecs(uid).map((r) => (r.id === id ? { ...r, status } : r));
+  writeLocalRecs(uid, inbox);
+  if (mode === 'local' || !supabase || !currentUserId) return;
   await supabase.from('book_recommendations').update({ status }).eq('id', id);
 }
 
@@ -745,8 +763,21 @@ export function subscribeToInbox(
         table: 'book_recommendations',
         filter: `to_user=eq.${userId}`,
       },
-      (payload: { new: Record<string, unknown> }) => {
-        onNew(rowToRec(payload.new, 'A reader'));
+      async (payload: { new: Record<string, unknown> }) => {
+        // Fetch the sender's name from profiles
+        const fromUserId = payload.new.from_user as string;
+        let fromName = 'A reader';
+        if (fromUserId && client) {
+          const { data: profile } = await client
+            .from('profiles')
+            .select('name')
+            .eq('id', fromUserId)
+            .single();
+          if (profile?.name) {
+            fromName = profile.name;
+          }
+        }
+        onNew(rowToRec(payload.new, fromName));
       },
     )
     .subscribe();
@@ -788,21 +819,20 @@ function writeLocalReading(userId: string, list: CurrentlyReading[]) {
 
 export async function markReading(bookId: string): Promise<void> {
   if (!currentUserId) return;
-  if (mode === 'local' || !supabase) {
-    const list = readLocalReading(currentUserId);
-    if (!list.find((r) => r.bookId === bookId)) {
-      writeLocalReading(currentUserId, [
-        {
-          userId: currentUserId,
-          bookId,
-          status: 'reading',
-          startedAt: new Date().toISOString(),
-        },
-        ...list,
-      ]);
-    }
-    return;
+  // Always persist to localStorage as backup (survives Supabase table errors).
+  const list = readLocalReading(currentUserId);
+  if (!list.find((r) => r.bookId === bookId)) {
+    writeLocalReading(currentUserId, [
+      {
+        userId: currentUserId,
+        bookId,
+        status: 'reading',
+        startedAt: new Date().toISOString(),
+      },
+      ...list,
+    ]);
   }
+  if (mode === 'local' || !supabase) return;
   await supabase.from('currently_reading').upsert({
     user_id: currentUserId,
     book_id: bookId,
@@ -814,13 +844,12 @@ export async function markReading(bookId: string): Promise<void> {
 
 export async function stopReading(bookId: string): Promise<void> {
   if (!currentUserId) return;
-  if (mode === 'local' || !supabase) {
-    writeLocalReading(
-      currentUserId,
-      readLocalReading(currentUserId).filter((r) => r.bookId !== bookId),
-    );
-    return;
-  }
+  // Always update localStorage backup.
+  writeLocalReading(
+    currentUserId,
+    readLocalReading(currentUserId).filter((r) => r.bookId !== bookId),
+  );
+  if (mode === 'local' || !supabase) return;
   await supabase
     .from('currently_reading')
     .delete()
@@ -835,7 +864,9 @@ export async function listMyReading(userId: string): Promise<CurrentlyReading[]>
     .select('user_id, book_id, status, started_at')
     .eq('user_id', userId)
     .order('started_at', { ascending: false });
-  return (data ?? []).map(rowToReading);
+  // Fall back to localStorage if Supabase returns nothing (e.g. table missing).
+  if (!data || data.length === 0) return readLocalReading(userId);
+  return data.map(rowToReading);
 }
 
 export async function listReadersOfBook(bookId: string): Promise<CurrentlyReading[]> {
@@ -885,6 +916,39 @@ export function subscribeToReadersOfBook(
         filter: `book_id=eq.${bookId}`,
       },
       () => onChange(),
+    )
+    .subscribe();
+  return () => {
+    void client.removeChannel(channel);
+  };
+}
+
+/** Subscribe to the current user's reading list for real-time sync. */
+export function subscribeToMyReading(
+  userId: string,
+  onChange: (reading: CurrentlyReading[]) => void,
+): () => void {
+  if (mode === 'local' || !supabase) return () => {};
+  const client = supabase;
+  const channel = client
+    .channel(`my-reading-${userId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'currently_reading',
+        filter: `user_id=eq.${userId}`,
+      },
+      async () => {
+        // Refetch the reading list when changes occur
+        const { data } = await client
+          .from('currently_reading')
+          .select('user_id, book_id, status, started_at')
+          .eq('user_id', userId)
+          .order('started_at', { ascending: false });
+        onChange((data ?? []).map(rowToReading));
+      },
     )
     .subscribe();
   return () => {

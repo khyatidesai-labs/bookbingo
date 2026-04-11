@@ -32,10 +32,12 @@ import {
   saveBingoCard,
   saveProfile,
   sendRecommendation,
+  setCurrentUser,
   signInWithUsername,
   signOut,
   stopReading,
   subscribeToInbox,
+  subscribeToMyReading,
   subscribeToReadersOfBook,
   updateRecommendationStatus,
   type DirectoryReader,
@@ -178,6 +180,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const customSession = getCurrentSession();
       if (customSession) {
         if (cancelled) return;
+        // Sync storage module so markReading/listMyReading use the right userId
+        setCurrentUser(customSession.id, 'supabase');
         await loadForUser(customSession.id, 'supabase');
         if (cancelled) return;
         setReady(true);
@@ -213,6 +217,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
     return () => unsub();
   }, [profile]);
+
+  // Subscribe to reading list changes for real-time sync (only after initial load)
+  useEffect(() => {
+    if (!profile || !ready) return;
+    const unsub = subscribeToMyReading(profile.id, (updatedReading) => {
+      setReading(updatedReading);
+    });
+    return () => unsub();
+  }, [profile, ready]);
 
   // Seed a March 2026 card the first time a user's account has no cards.
   useEffect(() => {
@@ -499,6 +512,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         };
         setReading((prev) => [optimistic, ...prev]);
         await markReading(bookId);
+        // Reload reading list to ensure sync with backend, but only replace
+        // state if the backend actually returned data (avoids wiping optimistic
+        // state when Supabase tables are missing or the request fails).
+        if (profile?.id) {
+          const updated = await listMyReading(profile.id);
+          if (updated.length > 0) setReading(updated);
+        }
         // Refresh the readers list for the modal so the user sees themselves.
         if (openedBookId === bookId) {
           setReadersForOpened(await listReadersOfBook(bookId));

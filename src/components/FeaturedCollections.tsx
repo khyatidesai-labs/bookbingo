@@ -31,6 +31,21 @@ const collections = [
   },
 ];
 
+// Correct matching logic - count books with exact genre/mood matches
+function countBooksForCollection(collection: typeof collections[0]): number {
+  return BOOKS.filter((book) => {
+    // Check if book has ALL collection tags in its genres or moods
+    const hasAllTags = collection.tags.every((tag) => {
+      const tagLower = tag.toLowerCase();
+      return (
+        book.genres.some((g) => g.toLowerCase() === tagLower) ||
+        book.moods?.some((m) => m.toLowerCase() === tagLower)
+      );
+    });
+    return hasAllTags;
+  }).length;
+}
+
 export default function FeaturedCollections() {
   const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
   const [viewingBooks, setViewingBooks] = useState(false);
@@ -44,17 +59,7 @@ export default function FeaturedCollections() {
     const counts: Record<string, number> = {};
 
     collections.forEach((collection) => {
-      const count = BOOKS.filter((book) => {
-        const hasMatchingGenre = collection.tags.some((tag) =>
-          book.genres.some((g) => g.toLowerCase().includes(tag.toLowerCase()))
-        );
-        const hasMatchingMood = collection.tags.some((tag) =>
-          book.moods?.some((m) => m.toLowerCase().includes(tag.toLowerCase()))
-        );
-        return hasMatchingGenre || hasMatchingMood;
-      }).length;
-
-      counts[collection.title] = count;
+      counts[collection.title] = countBooksForCollection(collection);
     });
 
     setCollectionCounts(counts);
@@ -79,13 +84,14 @@ export default function FeaturedCollections() {
     try {
       // First, try to get books from local database
       let matchedBooks = BOOKS.filter((book) => {
-        const hasMatchingGenre = collection.tags.some((tag) =>
-          book.genres.some((g) => g.toLowerCase().includes(tag.toLowerCase()))
-        );
-        const hasMatchingMood = collection.tags.some((tag) =>
-          book.moods?.some((m) => m.toLowerCase().includes(tag.toLowerCase()))
-        );
-        return hasMatchingGenre || hasMatchingMood;
+        const hasAllTags = collection.tags.every((tag) => {
+          const tagLower = tag.toLowerCase();
+          return (
+            book.genres.some((g) => g.toLowerCase() === tagLower) ||
+            book.moods?.some((m) => m.toLowerCase() === tagLower)
+          );
+        });
+        return hasAllTags;
       });
 
       // If no local matches, fetch from Open Library with caching
