@@ -31,17 +31,19 @@ export default function Hero() {
   })();
 
   return (
-    <section className="relative pt-20 pb-10 md:pt-24 md:pb-12 overflow-hidden bg-gradient-to-br from-primary-900 via-[#14142B] to-primary-800">
+    <section className="relative pt-20 pb-10 md:pt-24 md:pb-12 overflow-hidden" style={{ background: 'linear-gradient(135deg, #12100E 0%, #1E1208 40%, #2A1A08 70%, #12100E 100%)' }}>
       {/* ambient glow */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-10 left-1/3 w-[28rem] h-[28rem] bg-accent-500/20 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-0 w-[24rem] h-[24rem] bg-rose-500/10 rounded-full blur-3xl" />
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-accent-500/40 to-transparent" />
+        <div className="absolute top-10 left-1/4 w-[32rem] h-[32rem] bg-accent-600/15 rounded-full blur-3xl" />
+        <div className="absolute top-0 right-0 w-[20rem] h-[20rem] bg-amber-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-[24rem] h-[16rem] bg-orange-900/20 rounded-full blur-3xl" />
         <div
-          className="absolute inset-0 opacity-[0.04]"
+          className="absolute inset-0 opacity-[0.03]"
           style={{
             backgroundImage:
-              'radial-gradient(circle at 1px 1px, white 1px, transparent 0)',
-            backgroundSize: '32px 32px',
+              'radial-gradient(circle at 1px 1px, rgba(249,115,22,0.8) 1px, transparent 0)',
+            backgroundSize: '40px 40px',
           }}
         />
       </div>
@@ -62,7 +64,7 @@ export default function Hero() {
 
             <h1 className="font-heading text-3xl md:text-4xl lg:text-5xl text-white font-bold leading-[1.05] mb-3 tracking-tight">
               Read together.
-              <span className="italic bg-gradient-to-r from-accent-300 via-pink-200 to-accent-300 bg-clip-text text-transparent">
+              <span className="italic bg-gradient-to-r from-accent-300 via-amber-200 to-accent-400 bg-clip-text text-transparent">
                 {' '}Never alone.
               </span>
             </h1>
@@ -86,7 +88,7 @@ export default function Hero() {
                 onClick={() => scrollTo('bingo')}
                 className="font-body font-semibold px-4 py-2 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-full hover:bg-white/15 transition-all duration-200 text-xs flex items-center gap-1.5"
               >
-                <Sparkles size={12} className="text-accent-300" />
+                <Sparkles size={12} className="text-accent-400" />
                 Start Bingo
               </button>
             </div>
@@ -111,7 +113,7 @@ export default function Hero() {
 
           {/* RIGHT — book cover stack */}
           <div className="relative hidden md:block">
-            <div className="absolute inset-0 bg-gradient-to-br from-accent-500/20 to-transparent rounded-[2.5rem] blur-2xl" />
+            <div className="absolute inset-0 bg-gradient-to-br from-accent-600/25 via-amber-500/10 to-transparent rounded-[2.5rem] blur-2xl" />
             <div className="relative">
               {/* three stacked covers */}
               <div className="relative h-64 flex items-center justify-center">

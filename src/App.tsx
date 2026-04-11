@@ -31,7 +31,7 @@ function GlobalOverlays() {
 export default function App() {
   return (
     <AppProvider>
-      <div className="min-h-screen bg-[#F8FAFC] font-body">
+      <div className="min-h-screen bg-primary-50 font-body">
         <Navbar />
         <Hero />
         <ReadingShelf />
