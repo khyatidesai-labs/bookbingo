@@ -33,6 +33,12 @@ export default function BookCard({ book, tag, onClick, readerCount }: Props) {
               alt={book.title}
               className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
               onError={() => setImgOk(false)}
+              onLoad={(e) => {
+                // OpenLibrary returns 1px placeholder for missing covers
+                if ((e.currentTarget as HTMLImageElement).naturalHeight <= 1) {
+                  setImgOk(false);
+                }
+              }}
             />
           ) : (
             <div

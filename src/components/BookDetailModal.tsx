@@ -113,6 +113,11 @@ export default function BookDetailModal({ book, onClose }: Props) {
               alt={book.title}
               className="w-full h-full object-cover"
               onError={() => setImgOk(false)}
+              onLoad={(e) => {
+                if ((e.currentTarget as HTMLImageElement).naturalHeight <= 1) {
+                  setImgOk(false);
+                }
+              }}
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-accent-100 to-accent-300">

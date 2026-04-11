@@ -108,7 +108,25 @@ interface OpenAIPick {
   reason: string;
 }
 
-const cache = new Map<string, ScoredBook[]>();
+// 30-minute localStorage cache so results survive page reloads and are only
+// re-fetched from OpenAI once every 30 minutes per unique filter combination.
+const CACHE_LS_KEY = 'bookbingo.openai.cache';
+const CACHE_TTL_MS = 30 * 60 * 1000;
+
+interface CacheEntry {
+  result: ScoredBook[];
+  ts: number;
+}
+
+function lsGetCache(): Record<string, CacheEntry> {
+  try {
+    return JSON.parse(localStorage.getItem(CACHE_LS_KEY) ?? '{}') as Record<string, CacheEntry>;
+  } catch { return {}; }
+}
+
+function lsSetCache(store: Record<string, CacheEntry>): void {
+  try { localStorage.setItem(CACHE_LS_KEY, JSON.stringify(store)); } catch {}
+}
 
 function cacheKey(filter: RecommendationFilter, limit: number): string {
   return JSON.stringify({
@@ -131,8 +149,9 @@ export async function recommendWithOpenAI(
   if (!apiKey) return recommend(filter, limit);
 
   const key = cacheKey(filter, limit);
-  const cached = cache.get(key);
-  if (cached) return cached;
+  const store = lsGetCache();
+  const cached = store[key];
+  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return cached.result;
 
   // Build a candidate pool with the rule-based scorer so we never hand the
   // model more than ~40 books. Falls back to a general "trending" slice.
@@ -228,7 +247,9 @@ export async function recommendWithOpenAI(
     });
 
     const result = ranked.length > 0 ? ranked.slice(0, limit) : pool.slice(0, limit);
-    cache.set(key, result);
+    const newStore = lsGetCache();
+    newStore[key] = { result, ts: Date.now() };
+    lsSetCache(newStore);
     return result;
   } catch (err) {
     console.warn('[openai] error, falling back to rule-based', err);

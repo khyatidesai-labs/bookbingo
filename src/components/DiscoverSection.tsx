@@ -1,14 +1,14 @@
-import { useState, useEffect } from 'react';
-import { Compass, Briefcase, Sparkles, Trophy, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Compass, Briefcase, Sparkles, BookOpen } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
 import { PROFESSIONS } from '../data/professions';
 import { MOODS } from '../data/moods';
-import { CHALLENGE_BY_ID } from '../data/bingoChallenges';
+import { BOOKS } from '../data/books';
 import BookCard from './BookCard';
 import type { Book } from '../types';
 
-type Tab = 'profession' | 'mood' | 'challenge';
+type Tab = 'profession' | 'mood' | 'genre';
 
 const PROFESSION_IMAGES: Record<string, string> = {
   designer: 'https://images.pexels.com/photos/196645/pexels-photo-196645.jpeg?auto=compress&cs=tinysrgb&w=400',
@@ -59,20 +59,18 @@ async function fetchByMood(mood: string): Promise<Book[]> {
   return (data ?? []).map(mapDbBook);
 }
 
-async function fetchByGenreKeywords(keywords: string[]): Promise<Book[]> {
-  if (!supabase) return [];
-  const { data } = await supabase
-    .from('books')
-    .select('*')
-    .overlaps('genres', keywords)
-    .order('title')
-    .limit(20);
-  return (data ?? []).map(mapDbBook);
-}
-
-const CHALLENGE_GENRE_MAP: Record<string, string[]> = {
-  default: ['literary', 'classic', 'nonfiction', 'fantasy', 'scifi', 'thriller', 'mystery'],
-};
+const GENRES = [
+  { id: 'fiction', label: 'Fiction', image: 'https://images.pexels.com/photos/2908984/pexels-photo-2908984.jpeg?auto=compress&cs=tinysrgb&w=400' },
+  { id: 'science-fiction', label: 'Science Fiction', image: 'https://images.pexels.com/photos/924824/pexels-photo-924824.jpeg?auto=compress&cs=tinysrgb&w=400' },
+  { id: 'mystery', label: 'Mystery', image: 'https://images.pexels.com/photos/3621344/pexels-photo-3621344.jpeg?auto=compress&cs=tinysrgb&w=400' },
+  { id: 'fantasy', label: 'Fantasy', image: 'https://images.pexels.com/photos/5699519/pexels-photo-5699519.jpeg?auto=compress&cs=tinysrgb&w=400' },
+  { id: 'biography', label: 'Biography', image: 'https://images.pexels.com/photos/3184396/pexels-photo-3184396.jpeg?auto=compress&cs=tinysrgb&w=400' },
+  { id: 'history', label: 'History', image: 'https://images.pexels.com/photos/207662/pexels-photo-207662.jpeg?auto=compress&cs=tinysrgb&w=400' },
+  { id: 'self-help', label: 'Self-Help', image: 'https://images.pexels.com/photos/1181671/pexels-photo-1181671.jpeg?auto=compress&cs=tinysrgb&w=400' },
+  { id: 'romance', label: 'Romance', image: 'https://images.pexels.com/photos/1024993/pexels-photo-1024993.jpeg?auto=compress&cs=tinysrgb&w=400' },
+  { id: 'thriller', label: 'Thriller', image: 'https://images.pexels.com/photos/3648025/pexels-photo-3648025.jpeg?auto=compress&cs=tinysrgb&w=400' },
+  { id: 'philosophy', label: 'Philosophy', image: 'https://images.pexels.com/photos/301920/pexels-photo-301920.jpeg?auto=compress&cs=tinysrgb&w=400' },
+];
 
 export default function DiscoverSection() {
   const { openBook, setDynamicBook } = useApp();
@@ -81,7 +79,16 @@ export default function DiscoverSection() {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const challenges = Object.values(CHALLENGE_BY_ID).slice(0, 16);
+  const genresWithBooks = useMemo(() =>
+    GENRES.filter(genre =>
+      BOOKS.some(book =>
+        book.genres.some(g =>
+          g.toLowerCase().includes(genre.label.toLowerCase()) ||
+          genre.label.toLowerCase().includes(g.toLowerCase())
+        )
+      )
+    ),
+  []);
 
   useEffect(() => {
     if (!selectedFilter) { setBooks([]); return; }
@@ -92,12 +99,16 @@ export default function DiscoverSection() {
         results = await fetchByProfession(selectedFilter);
       } else if (tab === 'mood') {
         results = await fetchByMood(selectedFilter);
-      } else {
-        const ch = CHALLENGE_BY_ID[selectedFilter];
-        const keywords = ch
-          ? ch.label.toLowerCase().split(/\s+/).filter((w) => w.length > 3)
-          : CHALLENGE_GENRE_MAP.default;
-        results = await fetchByGenreKeywords(keywords.length ? keywords : CHALLENGE_GENRE_MAP.default);
+      } else if (tab === 'genre') {
+        const genre = GENRES.find(g => g.id === selectedFilter);
+        if (genre) {
+          results = BOOKS.filter(book =>
+            book.genres.some(g =>
+              g.toLowerCase().includes(genre.label.toLowerCase()) ||
+              genre.label.toLowerCase().includes(g.toLowerCase())
+            )
+          ).slice(0, 20);
+        }
       }
       setBooks(results);
       setLoading(false);
@@ -119,7 +130,7 @@ export default function DiscoverSection() {
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'profession', label: 'Profession', icon: <Briefcase size={13} /> },
     { id: 'mood', label: 'Mood', icon: <Sparkles size={13} /> },
-    { id: 'challenge', label: 'Challenge', icon: <Trophy size={13} /> },
+    { id: 'genre' as Tab, label: 'Genre', icon: <BookOpen size={13} /> },
   ];
 
   return (
@@ -268,33 +279,36 @@ export default function DiscoverSection() {
           </div>
         )}
 
-        {tab === 'challenge' && (
-          <div className="flex gap-2 pb-2 -mx-6 px-6 flex-wrap">
-            {challenges.map((ch) => {
-              const active = selectedFilter === ch.id;
+        {tab === 'genre' && (
+          <div className="flex gap-3 overflow-x-auto pb-3 -mx-6 px-6 scrollbar-hide">
+            {genresWithBooks.map((genre) => {
+              const active = selectedFilter === genre.id;
               return (
                 <button
-                  key={ch.id}
-                  onClick={() => setSelectedFilter(active ? null : ch.id)}
-                  className="flex-none flex items-center gap-1.5 font-body text-xs font-medium px-3.5 py-2 rounded-full transition-all duration-200"
-                  style={
-                    active
-                      ? {
-                          background: 'linear-gradient(135deg, #7C3AED, #A855F7)',
-                          color: '#fff',
-                          boxShadow: '0 2px 10px rgba(124,58,237,0.4)',
-                          border: '1px solid transparent',
-                        }
-                      : {
-                          background: 'rgba(124,58,237,0.1)',
-                          color: 'rgba(255,255,255,0.6)',
-                          border: '1px solid rgba(124,58,237,0.2)',
-                        }
-                  }
+                  key={genre.id}
+                  onClick={() => setSelectedFilter(active ? null : genre.id)}
+                  className="flex-none relative h-24 w-40 rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.04] hover:-translate-y-1"
+                  style={{
+                    border: active ? '2px solid rgba(167,139,250,0.7)' : '1px solid rgba(124,58,237,0.18)',
+                    boxShadow: active ? '0 4px 20px rgba(124,58,237,0.4)' : '0 2px 10px rgba(0,0,0,0.3)',
+                  }}
                 >
-                  <Trophy size={11} style={{ opacity: active ? 0.8 : 0.6 }} />
-                  {ch.label}
-                  {active && <ChevronRight size={11} style={{ opacity: 0.7 }} />}
+                  <img src={genre.image} alt={genre.label} className="absolute inset-0 w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                  {active && (
+                    <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.35), transparent 60%)' }} />
+                  )}
+                  <div className="absolute bottom-0 left-0 right-0 p-2.5">
+                    <p className="font-heading text-white font-bold text-xs leading-tight">{genre.label}</p>
+                  </div>
+                  {active && (
+                    <div
+                      className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center"
+                      style={{ background: 'linear-gradient(135deg, #7C3AED, #A855F7)', boxShadow: '0 2px 8px rgba(124,58,237,0.6)' }}
+                    >
+                      <span className="text-white text-[10px] font-bold">✓</span>
+                    </div>
+                  )}
                 </button>
               );
             })}
@@ -336,7 +350,7 @@ export default function DiscoverSection() {
               ? 'Select a profession above to see curated books.'
               : tab === 'mood'
               ? 'Pick a mood to find matching books.'
-              : 'Choose a challenge to discover books.'}
+              : 'Pick a genre to discover books.'}
           </p>
         )}
       </div>

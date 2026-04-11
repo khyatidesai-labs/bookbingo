@@ -58,6 +58,10 @@ interface AppState {
   ready: boolean;
   mode: StorageMode;
   profile: UserProfile | null;
+  /** Cache of dynamically fetched books (from AI/edge-function sections).
+   *  Keyed by book.id so ReadingShelf and SavedDrawer can look them up even
+   *  after the detail modal closes or the page is reloaded. */
+  dynamicBooksMap: Record<string, Book>;
 
   /** Transient UI state — kept here so any component can trigger modals. */
   openedBookId: string | null;
@@ -137,6 +141,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [openedBookId, setOpenedBookId] = useState<string | null>(null);
   const [dynamicBook, setDynamicBook] = useState<Book | null>(null);
+  const [dynamicBooksMap, setDynamicBooksMap] = useState<Record<string, Book>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('bookbingo.dynamicBooks') ?? '{}') as Record<string, Book>;
+    } catch { return {}; }
+  });
   const [savedDrawerOpen, setSavedDrawerOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [reading, setReading] = useState<CurrentlyReading[]>([]);
@@ -146,6 +155,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const openBook = useCallback((bookId: string) => setOpenedBookId(bookId), []);
   const closeBook = useCallback(() => { setOpenedBookId(null); setDynamicBook(null); }, []);
+
+  // Wrap setDynamicBook so every AI/edge-function book is saved to the
+  // persistent cache — this lets ReadingShelf look them up after the modal closes.
+  const setDynamicBookPersist = useCallback((book: Book | null) => {
+    setDynamicBook(book);
+    if (book) {
+      setDynamicBooksMap((prev) => {
+        const next = { ...prev, [book.id]: book };
+        try { localStorage.setItem('bookbingo.dynamicBooks', JSON.stringify(next)); } catch {}
+        return next;
+      });
+    }
+  }, []);
   const openSavedDrawer = useCallback(() => setSavedDrawerOpen(true), []);
   const closeSavedDrawer = useCallback(() => setSavedDrawerOpen(false), []);
   const openAuthModal = useCallback(() => setAuthModalOpen(true), []);
@@ -201,10 +223,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [loadForUser]);
 
   // Follow Supabase auth changes so signing in/out swaps everything over
-  // without a reload. Also (re)subscribes the realtime inbox channel.
+  // without a reload. Guard: if a custom auth session is active, do NOT let
+  // Supabase's anonymous session restoration overwrite the custom user's state.
   useEffect(() => {
     const unsub = onAuthChange((uid) => {
       if (!uid) return;
+      // If the user is authenticated via custom auth, ignore Supabase auth
+      // events (e.g. anonymous session restored on page load) so they don't
+      // overwrite the custom user's profile/cards/inbox with the anon user's.
+      const customSession = getCurrentSession();
+      if (customSession) return;
       void loadForUser(uid, 'supabase');
     });
     return () => unsub();
@@ -306,8 +334,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ---- saved books --------------------------------------------------------
   const savedBookIds = profile?.savedBookIds ?? [];
   const savedBooks = useMemo(
-    () => savedBookIds.map((id) => BOOK_BY_ID[id]).filter(Boolean),
-    [savedBookIds],
+    () => savedBookIds.map((id) => BOOK_BY_ID[id] ?? dynamicBooksMap[id]).filter(Boolean),
+    [savedBookIds, dynamicBooksMap],
   );
   const isSaved = useCallback(
     (bookId: string) => savedBookIds.includes(bookId),
@@ -575,11 +603,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     ready,
     mode,
     profile,
+    dynamicBooksMap,
     openedBookId,
     dynamicBook,
     openBook,
     closeBook,
-    setDynamicBook,
+    setDynamicBook: setDynamicBookPersist,
     savedDrawerOpen,
     openSavedDrawer,
     closeSavedDrawer,

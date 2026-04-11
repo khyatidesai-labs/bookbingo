@@ -1,6 +1,26 @@
 import { TrendingUp, Sparkles, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
+
+const TTL_MS = 30 * 60 * 1000;
+
+function trendingCacheKey(profession?: string, moods?: string[]): string {
+  return `bookbingo.trending.${profession ?? ''}.${(moods ?? []).slice().sort().join(',')}`;
+}
+
+function readTrendingCache(key: string): import('../types').Book[] | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const { books, ts } = JSON.parse(raw) as { books: import('../types').Book[]; ts: number };
+    if (Date.now() - ts < TTL_MS) return books;
+  } catch {}
+  return null;
+}
+
+function writeTrendingCache(key: string, books: import('../types').Book[]): void {
+  try { localStorage.setItem(key, JSON.stringify({ books, ts: Date.now() })); } catch {}
+}
 import { PROFESSION_BY_ID } from '../data/professions';
 import { MOOD_BY_ID } from '../data/moods';
 import BookCard from './BookCard';
@@ -19,13 +39,24 @@ export default function TrendingNow() {
 
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
+  const [visibleBooks, setVisibleBooks] = useState<Book[]>([]);
+  const [filtering, setFiltering] = useState(false);
 
   const hasFilters = Boolean(selectedProfession || selectedMoods.length);
   const activeProfession = selectedProfession ? PROFESSION_BY_ID[selectedProfession] : null;
 
   useEffect(() => {
-    setLoading(true);
     const controller = new AbortController();
+    const cacheKey = trendingCacheKey(selectedProfession, selectedMoods);
+
+    // Serve from cache first so the UI feels instant.
+    const cached = readTrendingCache(cacheKey);
+    if (cached) {
+      setBooks(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
 
     const loadBooks = async () => {
       try {
@@ -45,17 +76,52 @@ export default function TrendingNow() {
 
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        if (!controller.signal.aborted) setBooks(data.books ?? []);
+        if (!controller.signal.aborted) {
+          const freshBooks = data.books ?? [];
+          writeTrendingCache(cacheKey, freshBooks);
+          setBooks(freshBooks);
+        }
       } catch {
-        if (!controller.signal.aborted) setBooks([]);
+        // Cache already served (if available); don't wipe it on error.
+        if (!controller.signal.aborted && !cached) setBooks([]);
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
     };
 
-    loadBooks();
-    return () => controller.abort();
+    // Only hit the edge function if cache is missing or stale.
+    if (!cached) void loadBooks();
+    // Background refresh after TTL.
+    const timer = setTimeout(() => { if (!controller.signal.aborted) void loadBooks(); }, TTL_MS);
+
+    return () => { controller.abort(); clearTimeout(timer); };
   }, [selectedProfession, selectedMoods]);
+
+  useEffect(() => {
+    if (books.length === 0) {
+      setVisibleBooks([]);
+      setFiltering(false);
+      return;
+    }
+    setFiltering(true);
+    const promises = books.map(
+      (book) =>
+        new Promise<boolean>((resolve) => {
+          if (!book.cover || book.cover.includes('picsum.photos')) {
+            resolve(false);
+            return;
+          }
+          const img = new Image();
+          img.onload = () => resolve(img.naturalHeight > 1);
+          img.onerror = () => resolve(false);
+          img.src = book.cover;
+        }),
+    );
+    Promise.all(promises).then((results) => {
+      setVisibleBooks(books.filter((_, i) => results[i]));
+      setFiltering(false);
+    });
+  }, [books]);
 
   return (
     <section
@@ -115,7 +181,7 @@ export default function TrendingNow() {
           )}
         </div>
 
-        {loading ? (
+        {(loading || filtering) ? (
           <div className="flex gap-4 pb-2">
             {Array.from({ length: 7 }).map((_, i) => (
               <div key={i} className="flex-none w-36">
@@ -125,7 +191,7 @@ export default function TrendingNow() {
               </div>
             ))}
           </div>
-        ) : books.length === 0 ? (
+        ) : visibleBooks.length === 0 ? (
           <div
             className="text-center py-14 rounded-2xl"
             style={{ background: 'rgba(124,58,237,0.05)', border: '1px solid rgba(124,58,237,0.15)' }}
@@ -135,7 +201,7 @@ export default function TrendingNow() {
           </div>
         ) : (
           <div className="flex gap-4 overflow-x-auto pb-3 -mx-6 px-6 snap-x snap-mandatory scrollbar-hide">
-            {books.slice(0, 7).map((book) => (
+            {visibleBooks.slice(0, 7).map((book) => (
               <div key={book.id} className="snap-start">
                 <BookCard
                   book={book}

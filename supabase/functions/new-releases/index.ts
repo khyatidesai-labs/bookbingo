@@ -1,5 +1,15 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
+/** Stable, URL-safe slug so the same book always gets the same id. */
+function stableId(prefix: string, title: string, author: string): string {
+  const slug = `${title}-${author}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 60);
+  return `${prefix}-${slug}`;
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -114,7 +124,7 @@ Return ONLY a JSON array (no markdown, no code blocks, no explanation) with this
     parsed.slice(0, 10).map(async (item: any, idx: number) => {
       const cover = await fetchCoverFromOpenLibrary(item.title ?? "", item.author ?? "");
       return {
-        id: `ai-new-${idx}-${Date.now()}`,
+        id: stableId("ai-new", item.title ?? "", item.author ?? ""),
         title: item.title ?? "Unknown",
         author: item.author ?? "Unknown Author",
         cover,

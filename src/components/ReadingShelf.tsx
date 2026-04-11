@@ -18,6 +18,7 @@ export default function ReadingShelf() {
     profile,
     respondToRec,
     dynamicBook,
+    dynamicBooksMap,
     toggleReading,
   } = useApp();
 
@@ -43,11 +44,13 @@ export default function ReadingShelf() {
   const currentRec = validRecs[currentRecIndex];
   const currentRecBook = currentRec ? BOOK_BY_ID[currentRec.bookId] : null;
 
-  // Get all reading entries with valid books
+  // Get all reading entries with valid books — check static catalog first, then
+  // the persistent dynamic-books cache (AI/edge-function books), then the
+  // transient dynamicBook state (only set while the modal is open).
   const validReadingBooks = reading
     .map((r) => ({
       entry: r,
-      book: BOOK_BY_ID[r.bookId] ?? (dynamicBook?.id === r.bookId ? dynamicBook : null),
+      book: BOOK_BY_ID[r.bookId] ?? dynamicBooksMap[r.bookId] ?? (dynamicBook?.id === r.bookId ? dynamicBook : null),
     }))
     .filter(({ book }) => book);
 

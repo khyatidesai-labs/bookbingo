@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Check, Trophy, Plus, Sparkles, Trash2, Calendar } from 'lucide-react';
+import { Check, Trophy, Plus, Sparkles, Trash2, Calendar, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { CHALLENGE_BY_ID } from '../data/bingoChallenges';
 import { BOOK_BY_ID } from '../data/books';
@@ -366,6 +366,13 @@ export default function BingoSection() {
                                 className="absolute inset-0 w-full h-full object-cover"
                               />
                               <div className="absolute inset-0 bg-black/50" />
+                              <div
+                                role="button"
+                                onClick={(e) => { e.stopPropagation(); handleClearSquare(idx); }}
+                                className="absolute top-1 left-1 z-20 w-5 h-5 rounded-full flex items-center justify-center cursor-pointer bg-black/50 hover:bg-red-500/80 transition-colors"
+                              >
+                                <X size={9} className="text-white" />
+                              </div>
                               {completed && (
                                 <div
                                   className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center z-10"
@@ -399,7 +406,7 @@ export default function BingoSection() {
                   </div>
 
                   <p className="mt-4 text-center font-body text-[10px]" style={{ color: 'rgba(255,255,255,0.25)' }}>
-                    Tap to pick a book · right-click to clear
+                    Tap to pick a book · tap ✕ to remove
                   </p>
                 </div>
               )

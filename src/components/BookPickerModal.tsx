@@ -28,7 +28,9 @@ export default function BookPickerModal({
 
   const books: Book[] = useMemo(() => {
     if (!challenge) return [];
-    const matches = booksForChallenge(challenge, BOOKS);
+    const matches = booksForChallenge(challenge, BOOKS).filter(
+      (b) => b.cover && !b.cover.includes('picsum.photos'),
+    );
     if (!query.trim()) return matches;
     const q = query.toLowerCase();
     return matches.filter(
@@ -110,6 +112,8 @@ export default function BookPickerModal({
                         alt=""
                         className="w-full h-full object-cover"
                         loading="lazy"
+                        onError={(e) => (e.currentTarget.style.display = 'none')}
+                        onLoad={(e) => { if ((e.currentTarget as HTMLImageElement).naturalHeight <= 1) e.currentTarget.style.display = 'none'; }}
                       />
                     </div>
                     <div className="min-w-0 flex-1">

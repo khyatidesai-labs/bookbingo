@@ -53,6 +53,7 @@ export default function FeaturedCollections() {
   const [loading, setLoading] = useState(false);
   const [matchedCount, setMatchedCount] = useState(0);
   const [collectionCounts, setCollectionCounts] = useState<Record<string, number>>({});
+  const [brokenCovers, setBrokenCovers] = useState<Set<string>>(new Set());
 
   // Calculate matched counts for all collections
   useEffect(() => {
@@ -72,8 +73,10 @@ export default function FeaturedCollections() {
     const collection = collections.find((c) => c.title === selectedCollection);
     if (!collection) return;
 
-    const count = collectionCounts[selectedCollection] || 0;
-    setMatchedCount(count);
+    const localCount = collectionCounts[selectedCollection] || 0;
+    // Fall back to the collection's bookCount when no local matches exist
+    // (books will be fetched from OpenLibrary)
+    setMatchedCount(localCount > 0 ? localCount : collection.bookCount);
   }, [selectedCollection, collectionCounts]);
 
   const loadBooks = async (collectionTitle: string) => {
@@ -101,7 +104,11 @@ export default function FeaturedCollections() {
         matchedBooks = fetchedBooks;
       }
 
-      setBooks(matchedBooks.slice(0, 8));
+      const limited = matchedBooks.slice(0, collection.bookCount);
+      setBrokenCovers(new Set());
+      setBooks(limited);
+      // Update matchedCount to reflect the actual number of books loaded
+      setMatchedCount(limited.length);
       setViewingBooks(true);
     } catch (error) {
       console.error('Failed to load books:', error);
@@ -184,18 +191,28 @@ export default function FeaturedCollections() {
 
             {viewingBooks && (
               <>
-                <h2 className="font-heading text-2xl font-bold text-primary-900 mb-6">
+                <h2 className="font-heading text-2xl font-bold text-primary-900 mb-1">
                   Books in {selectedCollection}
                 </h2>
+                <p className="font-body text-sm text-primary-500 mb-5">
+                  {books.length} book{books.length === 1 ? '' : 's'}
+                </p>
                 <div className="grid grid-cols-2 gap-4 mb-6">
                   {books.map((book) => (
                     <div key={book.id} className="group cursor-pointer">
                       <div className="relative aspect-[2/3] rounded-lg overflow-hidden mb-2 bg-primary-100">
-                        {book.cover ? (
+                        {book.cover && !brokenCovers.has(book.id) ? (
                           <img
                             src={book.cover}
                             alt={book.title}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                            onLoad={(e) => {
+                              // OpenLibrary returns 1px placeholder for missing covers
+                              if ((e.currentTarget as HTMLImageElement).naturalHeight <= 1) {
+                                setBrokenCovers((prev) => new Set([...prev, book.id]));
+                              }
+                            }}
+                            onError={() => setBrokenCovers((prev) => new Set([...prev, book.id]))}
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary-100 to-primary-200">
@@ -297,7 +314,7 @@ export default function FeaturedCollections() {
                     ))}
                   </div>
                   <span className="flex items-center gap-1 font-body text-[10px] font-semibold text-primary-400 group-hover:text-primary-300 transition-colors">
-                    {collectionCounts[col.title] ?? col.bookCount}
+                    {(collectionCounts[col.title] || col.bookCount)}
                     <ArrowRight size={11} className="group-hover:translate-x-0.5 transition-transform" />
                   </span>
                 </div>

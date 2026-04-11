@@ -707,7 +707,11 @@ export async function sendRecommendation(params: {
 }
 
 export async function listInbox(userId: string): Promise<BookRecommendation[]> {
-  if (mode === 'local' || !supabase) return readLocalRecs(userId);
+  // localStorage path: always filter by 'pending' so dismissed/saved recs
+  // don't re-appear after a page reload.
+  if (mode === 'local' || !supabase) {
+    return readLocalRecs(userId).filter((r) => r.status === 'pending');
+  }
   const { data, error } = await supabase
     .from('book_recommendations')
     .select('id, from_user, to_user, book_id, note, status, created_at, profiles!book_recommendations_from_user_fkey(name)')
@@ -715,8 +719,10 @@ export async function listInbox(userId: string): Promise<BookRecommendation[]> {
     .eq('status', 'pending')
     .order('created_at', { ascending: false })
     .limit(100);
-  // Fall back to localStorage if Supabase table is missing or returns nothing.
-  if (error || !data || data.length === 0) return readLocalRecs(userId);
+  // Fall back to localStorage (pending only) if Supabase table is missing.
+  if (error || !data || data.length === 0) {
+    return readLocalRecs(userId).filter((r) => r.status === 'pending');
+  }
   return data.map((r: Record<string, unknown>) =>
     rowToRec(r, (r.profiles as { name?: string } | undefined)?.name ?? 'A reader'),
   );

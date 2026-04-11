@@ -5,6 +5,24 @@ import BookCard from './BookCard';
 import type { Book } from '../types';
 
 const EDGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/new-releases`;
+const LS_KEY = 'bookbingo.newReleases';
+const TTL_MS = 30 * 60 * 1000;
+
+interface CachedReleases { books: Book[]; ts: number; }
+
+function readCache(): Book[] | null {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    const { books, ts } = JSON.parse(raw) as CachedReleases;
+    if (Date.now() - ts < TTL_MS) return books;
+  } catch {}
+  return null;
+}
+
+function writeCache(books: Book[]): void {
+  try { localStorage.setItem(LS_KEY, JSON.stringify({ books, ts: Date.now() })); } catch {}
+}
 
 async function fetchNewReleasesFromEdge(): Promise<Book[]> {
   const res = await fetch(EDGE_URL, {
@@ -24,23 +42,31 @@ export default function NewLaunchesSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  const loadNewReleases = async () => {
+  const loadNewReleases = async (forceRefresh = false) => {
+    if (!forceRefresh) {
+      const cached = readCache();
+      if (cached) { setBooks(cached); setLoading(false); return; }
+    }
     setLoading(true);
     setError(false);
     try {
       const newBooks = await fetchNewReleasesFromEdge();
+      writeCache(newBooks);
       setBooks(newBooks);
     } catch {
-      setError(true);
+      const cached = readCache();
+      if (cached) { setBooks(cached); } else { setError(true); }
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadNewReleases();
-    const interval = setInterval(loadNewReleases, 1000 * 60 * 60 * 24);
+    void loadNewReleases();
+    // Refresh from edge function every 30 minutes in the background.
+    const interval = setInterval(() => void loadNewReleases(true), TTL_MS);
     return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -93,7 +119,7 @@ export default function NewLaunchesSection() {
           >
             <p className="font-body text-white/45 mb-4">Could not load new releases.</p>
             <button
-              onClick={loadNewReleases}
+              onClick={() => void loadNewReleases(true)}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold text-white transition-all"
               style={{ background: 'rgba(124,58,237,0.2)', border: '1px solid rgba(124,58,237,0.3)' }}
             >
@@ -119,7 +145,7 @@ export default function NewLaunchesSection() {
           >
             <p className="font-body text-white/45 mb-4">No new releases found.</p>
             <button
-              onClick={loadNewReleases}
+              onClick={() => void loadNewReleases(true)}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold text-white"
               style={{ background: 'rgba(124,58,237,0.2)', border: '1px solid rgba(124,58,237,0.3)' }}
             >
