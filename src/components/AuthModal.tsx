@@ -1,48 +1,85 @@
 import { useState } from 'react';
-import { X, Mail, Loader2, CheckCircle2 } from 'lucide-react';
+import { X, Lock, User, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { signUpWithUsernamePassword, signInWithUsernamePassword } from '../lib/customAuth';
 
 /**
- * Email-based sign in. When the user is currently browsing as an anonymous
- * guest, we upgrade that session in place via `updateUser({ email })` so
- * their saved books, bingo cards, and reading state all carry over with
- * the SAME auth.uid. Otherwise we fall back to the magic-link OTP flow.
- *
- * The copy shifts based on whether we're upgrading or creating — an
- * upgrade shows "confirm your email to finish", while a cold sign-in
- * shows "check your inbox for a magic link".
+ * Username/password authentication modal.
+ * Supports both sign-up and sign-in flows with validation.
  */
 export default function AuthModal() {
   const { authModalOpen, closeAuthModal, signIn, profile, signOut } = useApp();
-  const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
-  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
-  const [wasUpgrade, setWasUpgrade] = useState(false);
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
   if (!authModalOpen) return null;
 
-  const handleSend = async () => {
-    const trimmed = email.trim();
-    if (!trimmed.includes('@')) {
-      setErrorMsg('Please enter a valid email.');
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const trimmedUsername = username.trim().toLowerCase();
+
+    // Validation
+    if (trimmedUsername.length < 3) {
+      setErrorMsg('Username must be at least 3 characters');
       setStatus('error');
       return;
     }
+
+    if (!/^[a-z0-9_-]+$/.test(trimmedUsername)) {
+      setErrorMsg('Username can only contain letters, numbers, underscores, and hyphens');
+      setStatus('error');
+      return;
+    }
+
+    if (password.length < 6) {
+      setErrorMsg('Password must be at least 6 characters');
+      setStatus('error');
+      return;
+    }
+
+    if (mode === 'signup' && password !== confirmPassword) {
+      setErrorMsg('Passwords do not match');
+      setStatus('error');
+      return;
+    }
+
     try {
-      setStatus('sending');
+      setStatus('loading');
       setErrorMsg('');
-      const result = await signIn(trimmed, name.trim() || undefined);
-      setWasUpgrade(result.upgraded);
-      setStatus('sent');
+
+      let result;
+      if (mode === 'signup') {
+        result = await signUpWithUsernamePassword(trimmedUsername, password, displayName || undefined);
+      } else {
+        result = await signInWithUsernamePassword(trimmedUsername, password);
+      }
+
+      if (result.error) {
+        setErrorMsg(result.error);
+        setStatus('error');
+        return;
+      }
+
+      // Success
+      setStatus('success');
+      setTimeout(() => {
+        // Reload page to refresh auth state
+        window.location.reload();
+      }, 1000);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Sign-in failed.';
+      const msg = err instanceof Error ? err.message : 'Authentication failed';
       setErrorMsg(msg);
       setStatus('error');
     }
   };
 
-  const signedIn = Boolean(profile?.email);
+  const signedIn = Boolean(profile?.name && !profile?.isGuest);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -70,9 +107,7 @@ export default function AuthModal() {
               </h2>
               <p className="font-body text-xs text-primary-500 mb-4">
                 Reading as{' '}
-                <span className="font-semibold">{profile?.name ?? profile?.email}</span>
-                <br />
-                <span className="text-primary-400">{profile?.email}</span>
+                <span className="font-semibold">@{profile?.name}</span>
               </p>
               <div className="flex gap-2">
                 <button
@@ -95,77 +130,154 @@ export default function AuthModal() {
           ) : (
             <>
               <div className="w-10 h-10 rounded-lg bg-accent-50 flex items-center justify-center mb-3">
-                <Mail size={18} className="text-accent-600" />
+                <Lock size={18} className="text-accent-600" />
               </div>
               <h2 className="font-heading text-lg font-bold text-primary-900 mb-0.5">
-                Sign in to Book Bingo
+                {mode === 'signin' ? 'Sign in to Book Bingo' : 'Create your account'}
               </h2>
               <p className="font-body text-xs text-primary-500 mb-4 leading-snug">
-                One click to upgrade your guest session. Saved books, bingo
-                cards and reading state all carry over.
+                {mode === 'signin'
+                  ? 'Enter your username and password to continue'
+                  : 'Set up a username and password to get started'}
               </p>
 
-              <label className="block mb-3">
-                <span className="font-body text-[10px] font-semibold text-primary-600 uppercase tracking-wider">
-                  Display name
-                </span>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Jamie Reader"
-                  className="mt-1 w-full px-3 py-2 rounded-lg border border-primary-200 focus:border-accent-500 focus:ring-2 focus:ring-accent-100 outline-none text-sm"
-                  disabled={status === 'sending' || status === 'sent'}
-                />
-              </label>
+              <form onSubmit={handleSubmit} className="space-y-3">
+                {/* Username */}
+                <label className="block">
+                  <span className="font-body text-[10px] font-semibold text-primary-600 uppercase tracking-wider flex items-center gap-1 mb-1">
+                    <User size={11} />
+                    Username
+                  </span>
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="john_reader"
+                    className="w-full px-3 py-2 rounded-lg border border-primary-200 focus:border-accent-500 focus:ring-2 focus:ring-accent-100 outline-none text-sm"
+                    disabled={status === 'loading' || status === 'success'}
+                    autoComplete="username"
+                  />
+                  <span className="font-body text-[9px] text-primary-400 mt-0.5 block">
+                    3+ characters, letters, numbers, - and _
+                  </span>
+                </label>
 
-              <label className="block mb-4">
-                <span className="font-body text-[10px] font-semibold text-primary-600 uppercase tracking-wider">
-                  Email
-                </span>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="mt-1 w-full px-3 py-2 rounded-lg border border-primary-200 focus:border-accent-500 focus:ring-2 focus:ring-accent-100 outline-none text-sm"
-                  disabled={status === 'sending' || status === 'sent'}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') void handleSend();
-                  }}
-                />
-              </label>
-
-              {status === 'sent' ? (
-                <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2.5 mb-3">
-                  <p className="font-body text-xs text-emerald-800 flex items-start gap-1.5 leading-snug">
-                    <CheckCircle2 size={14} className="mt-0.5 flex-none" />
-                    {wasUpgrade
-                      ? 'Check your inbox and click the confirmation link. Your session stays linked — no re-signup needed.'
-                      : "Check your inbox for a magic link. Clicking it will sign you in."}
-                  </p>
-                </div>
-              ) : null}
-
-              {errorMsg && status === 'error' ? (
-                <p className="font-body text-xs text-rose-600 mb-3">{errorMsg}</p>
-              ) : null}
-
-              <button
-                onClick={handleSend}
-                disabled={status === 'sending' || status === 'sent'}
-                className="w-full font-body font-semibold text-sm py-2.5 rounded-lg bg-primary-900 text-white hover:bg-primary-800 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
-              >
-                {status === 'sending' ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" /> Sending…
-                  </>
-                ) : status === 'sent' ? (
-                  'Link sent'
-                ) : (
-                  'Send magic link'
+                {/* Display Name (signup only) */}
+                {mode === 'signup' && (
+                  <label className="block">
+                    <span className="font-body text-[10px] font-semibold text-primary-600 uppercase tracking-wider mb-1 block">
+                      Display name (optional)
+                    </span>
+                    <input
+                      type="text"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      placeholder="Jamie Reader"
+                      className="w-full px-3 py-2 rounded-lg border border-primary-200 focus:border-accent-500 focus:ring-2 focus:ring-accent-100 outline-none text-sm"
+                      disabled={status === 'loading' || status === 'success'}
+                    />
+                  </label>
                 )}
-              </button>
+
+                {/* Password */}
+                <label className="block">
+                  <span className="font-body text-[10px] font-semibold text-primary-600 uppercase tracking-wider flex items-center gap-1 mb-1">
+                    <Lock size={11} />
+                    Password
+                  </span>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-3 py-2 rounded-lg border border-primary-200 focus:border-accent-500 focus:ring-2 focus:ring-accent-100 outline-none text-sm"
+                    disabled={status === 'loading' || status === 'success'}
+                    autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                  />
+                  <span className="font-body text-[9px] text-primary-400 mt-0.5 block">
+                    6+ characters
+                  </span>
+                </label>
+
+                {/* Confirm Password (signup only) */}
+                {mode === 'signup' && (
+                  <label className="block">
+                    <span className="font-body text-[10px] font-semibold text-primary-600 uppercase tracking-wider mb-1 block">
+                      Confirm password
+                    </span>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full px-3 py-2 rounded-lg border border-primary-200 focus:border-accent-500 focus:ring-2 focus:ring-accent-100 outline-none text-sm"
+                      disabled={status === 'loading' || status === 'success'}
+                      autoComplete="new-password"
+                    />
+                  </label>
+                )}
+
+                {/* Success message */}
+                {status === 'success' && (
+                  <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2.5">
+                    <p className="font-body text-xs text-emerald-800 flex items-start gap-1.5">
+                      <CheckCircle2 size={14} className="mt-0.5 flex-none" />
+                      {mode === 'signup'
+                        ? 'Account created! Signing you in...'
+                        : 'Signed in successfully!'}
+                    </p>
+                  </div>
+                )}
+
+                {/* Error message */}
+                {errorMsg && status === 'error' && (
+                  <div className="rounded-lg bg-rose-50 border border-rose-200 px-3 py-2.5">
+                    <p className="font-body text-xs text-rose-800 flex items-start gap-1.5">
+                      <AlertCircle size={14} className="mt-0.5 flex-none" />
+                      {errorMsg}
+                    </p>
+                  </div>
+                )}
+
+                {/* Submit button */}
+                <button
+                  type="submit"
+                  disabled={status === 'loading' || status === 'success'}
+                  className="w-full font-body font-semibold text-sm py-2.5 rounded-lg bg-primary-900 text-white hover:bg-primary-800 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 mt-4"
+                >
+                  {status === 'loading' ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      {mode === 'signin' ? 'Signing in...' : 'Creating account...'}
+                    </>
+                  ) : status === 'success' ? (
+                    <>
+                      <CheckCircle2 size={14} /> Success!
+                    </>
+                  ) : (
+                    mode === 'signin' ? 'Sign in' : 'Create account'
+                  )}
+                </button>
+              </form>
+
+              {/* Mode toggle */}
+              <div className="mt-4 text-center border-t border-primary-100 pt-4">
+                <p className="font-body text-xs text-primary-600 mb-2">
+                  {mode === 'signin'
+                    ? "Don't have an account?"
+                    : 'Already have an account?'}
+                </p>
+                <button
+                  onClick={() => {
+                    setMode(mode === 'signin' ? 'signup' : 'signin');
+                    setErrorMsg('');
+                    setStatus('idle');
+                  }}
+                  className="font-body text-xs font-semibold text-accent-600 hover:text-accent-700"
+                >
+                  {mode === 'signin' ? 'Sign up' : 'Sign in instead'}
+                </button>
+              </div>
             </>
           )}
         </div>

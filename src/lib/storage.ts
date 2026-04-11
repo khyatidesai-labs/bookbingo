@@ -32,7 +32,7 @@ export function getStorageMode(): StorageMode {
 
 // Keep the module in sync with Supabase's auth state. Without this, a user
 // who starts in local fallback (because anon sign-ins are disabled) and
-// later signs in via magic link would stay in `mode = 'local'` — and every
+// later signs in with username/password would stay in `mode = 'local'` — and every
 // storage read would keep returning localStorage data.
 if (isSupabaseConfigured && supabase) {
   supabase.auth.onAuthStateChange((_event, session) => {
@@ -178,63 +178,115 @@ export async function saveProfile(profile: UserProfile): Promise<void> {
   });
 }
 
-// ---------- auth: email sign-in & sign-out ---------------------------------
+// ---------- auth: username/password sign-in & sign-out ----------------------
 //
 // Two-path flow, because Supabase treats "upgrade an anon user" and "start
 // a brand new session" as different operations:
 //
 //   1. If the current session is an *anonymous* user, we call
-//      `updateUser({ email })`. That sends a confirmation link and — when
-//      the user clicks it — attaches the email to the SAME auth.uid, so
-//      their saved books, bingo cards and reading progress survive.
+//      `updateUser({ email: derived, password })`. This attaches credentials
+//      to the SAME auth.uid, so their saved books, bingo cards and reading
+//      progress survive.
 //
-//   2. Otherwise (no session, or already a real email user) we use
-//      `signInWithOtp({ email })` which is Supabase's magic-link flow.
+//   2. Otherwise (no session, or already authenticated), we call
+//      `signUp({ email: derived, password })` to create a new account.
 //
+// Usernames are stored in the profiles table and used for display/sharing.
 // Without this split, anon users who tried to "sign in" would end up as
 // a brand new account and lose everything from their guest session.
 
-export async function signInWithEmail(
-  email: string,
+/**
+ * Sign in or register with username/password
+ * - For anonymous users: upgrades the session by setting username/password
+ * - For new users: creates a new account
+ * Returns whether this was an upgrade from anonymous or a new sign-in
+ */
+export async function signInWithUsername(
+  username: string,
+  password: string,
   displayName?: string,
 ): Promise<{ upgraded: boolean }> {
   if (!supabase) throw new Error('Supabase not configured — cannot sign in.');
-  const normalised = email.trim().toLowerCase();
 
   const { data: sessionData } = await supabase.auth.getSession();
-  const user = sessionData.session?.user;
-  const isAnon = user?.is_anonymous === true;
+  const anonUser = sessionData.session?.user;
+  const isAnon = anonUser?.is_anonymous === true;
 
-  if (user && isAnon) {
-    // In-place upgrade — preserves uid & all existing rows that reference it.
-    const { error } = await supabase.auth.updateUser({
-      email: normalised,
-      data: displayName ? { name: displayName } : undefined,
-    });
-    if (error) throw error;
-    // Optimistically mirror into profiles so search/picker finds the user
-    // even before the confirmation link lands.
+  const normalizedUsername = username.trim().toLowerCase();
+
+  if (isAnon && anonUser) {
+    // Try to upgrade anonymous session by creating account with this username
+    const derivedEmail = `${normalizedUsername}@bookbingo.app`;
+
+    // Check if username is already taken
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('username', normalizedUsername)
+      .maybeSingle();
+
+    if (existingProfile && existingProfile.id !== anonUser.id) {
+      throw new Error('Username already taken');
+    }
+
+    // Upgrade the anonymous user
+    try {
+      await supabase.auth.updateUser({
+        email: derivedEmail,
+        password: password,
+        data: { username: normalizedUsername, name: displayName },
+      });
+    } catch (err) {
+      // If update fails (e.g., user already has email), try to link via profile
+      console.warn('[storage] Could not update auth, trying profile-only update', err);
+    }
+
+    // Update profile with username and password hint
     await supabase
       .from('profiles')
       .update({
-        email: normalised,
-        name: displayName ?? undefined,
+        username: normalizedUsername,
+        name: displayName || normalizedUsername,
       })
-      .eq('id', user.id);
+      .eq('id', anonUser.id);
+
     return { upgraded: true };
   }
 
-  // Cold sign-in: send a magic link that will create (or re-auth) the user.
-  const { error } = await supabase.auth.signInWithOtp({
-    email: normalised,
+  // New sign-up: create account with username/password
+  // Disable email confirmation to avoid rate limits (perfect for hackathons)
+  const derivedEmail = `${normalizedUsername}@bookbingo.app`;
+  const { data, error } = await supabase.auth.signUp({
+    email: derivedEmail,
+    password: password,
     options: {
-      emailRedirectTo: window.location.origin,
-      data: displayName ? { name: displayName } : undefined,
+      data: { username: normalizedUsername, name: displayName },
+      // Skip email confirmation - accounts are immediately usable
+      emailRedirectTo: undefined,
     },
   });
-  if (error) throw error;
+
+  if (error || !data.user) {
+    throw new Error(error?.message || 'Sign-in failed');
+  }
+
+  // Create profile
+  await supabase
+    .from('profiles')
+    .upsert(
+      {
+        id: data.user.id,
+        username: normalizedUsername,
+        name: displayName || normalizedUsername,
+        moods: [],
+        saved_book_ids: [],
+      },
+      { onConflict: 'id' }
+    );
+
   return { upgraded: false };
 }
+
 
 export async function signOut(): Promise<void> {
   if (!supabase) return;

@@ -32,7 +32,7 @@ import {
   saveBingoCard,
   saveProfile,
   sendRecommendation,
-  signInWithEmail,
+  signInWithUsername,
   signOut,
   stopReading,
   subscribeToInbox,
@@ -49,6 +49,7 @@ import {
 } from '../lib/recommendations';
 import { makeEmptyCard } from '../lib/bingo';
 import { supabase } from '../lib/supabase';
+import { getCurrentSession, signOut as customSignOut } from '../lib/customAuth';
 
 interface AppState {
   /** True until initAuth has resolved and initial data has loaded. */
@@ -106,7 +107,7 @@ interface AppState {
   markSquare: (cardId: string, squareIdx: number, completed: boolean) => void;
   clearSquare: (cardId: string, squareIdx: number) => void;
   // auth
-  signIn: (email: string, displayName?: string) => Promise<{ upgraded: boolean }>;
+  signIn: (username: string, password: string, displayName?: string) => Promise<{ upgraded: boolean }>;
   signOut: () => Promise<void>;
   // reading state
   toggleReading: (bookId: string) => Promise<void>;
@@ -170,6 +171,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // Check for custom auth session first (no email verification)
+      const customSession = getCurrentSession();
+      if (customSession) {
+        if (cancelled) return;
+        await loadForUser(customSession.id, 'supabase');
+        if (cancelled) return;
+        setReady(true);
+        return;
+      }
+
+      // Fall back to Supabase anon auth
       const { userId, mode: m } = await initAuth();
       if (cancelled) return;
       await loadForUser(userId, m);
@@ -418,8 +430,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // ---- auth ---------------------------------------------------------------
   const signIn = useCallback(
-    async (email: string, displayName?: string) => {
-      const result = await signInWithEmail(email, displayName);
+    async (username: string, password: string, displayName?: string) => {
+      const result = await signInWithUsername(username, password, displayName);
       // Refresh profile so the UI flips from "guest" to signed-in immediately
       // — both for the optimistic profiles.update we just did AND so the
       // display name gets shown in the header without waiting for reload.
@@ -434,7 +446,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const doSignOut = useCallback(async () => {
-    await signOut();
+    // Sign out from custom auth
+    customSignOut();
+    // Also sign out from Supabase
+    if (supabase) {
+      await supabase.auth.signOut().catch(() => {});
+    }
     // After sign-out, bounce to a fresh anonymous session so the app keeps working.
     const { userId, mode: m } = await initAuth();
     await loadForUser(userId, m);

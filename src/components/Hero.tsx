@@ -1,6 +1,7 @@
 import { ArrowRight, Sparkles, Users } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { BOOKS } from '../data/books';
+import { getOptimizedImageProps } from '../lib/imageOptimization';
 
 /**
  * Compact editorial hero. Leads with a short headline, a clear primary CTA,
@@ -129,7 +130,7 @@ export default function Hero() {
                     >
                       <div className="w-28 h-40 rounded-lg overflow-hidden shadow-2xl ring-1 ring-white/10">
                         <img
-                          src={book.cover}
+                          {...getOptimizedImageProps(book.cover, 'hero')}
                           alt={book.title}
                           className="w-full h-full object-cover"
                         />

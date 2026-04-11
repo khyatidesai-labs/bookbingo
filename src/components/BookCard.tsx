@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { BookmarkPlus, BookmarkCheck, Users } from 'lucide-react';
 import type { Book } from '../types';
 import { useApp } from '../context/AppContext';
+import { getOptimizedImageProps } from '../lib/imageOptimization';
 
 interface Props {
   book: Book;
@@ -22,6 +23,7 @@ export default function BookCard({ book, tag, onClick, readerCount }: Props) {
   const { isSaved, toggleSaved } = useApp();
   const [imgOk, setImgOk] = useState(true);
   const saved = isSaved(book.id);
+  const imgProps = getOptimizedImageProps(book.cover, 'card');
 
   return (
     <div className="flex-none w-36 group cursor-pointer" onClick={onClick}>
@@ -30,11 +32,10 @@ export default function BookCard({ book, tag, onClick, readerCount }: Props) {
         <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-primary-100 shadow-md group-hover:shadow-2xl transition-all duration-300 group-hover:-translate-y-1 ring-1 ring-primary-900/5">
           {imgOk ? (
             <img
-              src={book.cover}
+              {...imgProps}
               alt={book.title}
               className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
               onError={() => setImgOk(false)}
-              loading="lazy"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-accent-200 to-accent-400">
