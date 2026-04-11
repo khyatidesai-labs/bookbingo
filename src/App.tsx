@@ -4,8 +4,6 @@ import ReadingShelf from './components/ReadingShelf';
 import NewLaunchesSection from './components/NewLaunchesSection';
 import TrendingNow from './components/TrendingNow';
 import DiscoverSection from './components/DiscoverSection';
-import ProfessionCategories from './components/ProfessionCategories';
-import MoodSection from './components/MoodSection';
 import BingoSection from './components/BingoSection';
 import CommunitySection from './components/CommunitySection';
 import FeaturedCollections from './components/FeaturedCollections';
@@ -38,8 +36,6 @@ export default function App() {
         <NewLaunchesSection />
         <TrendingNow />
         <DiscoverSection />
-        <ProfessionCategories />
-        <MoodSection />
         <BingoSection />
         <CommunitySection />
         <FeaturedCollections />
